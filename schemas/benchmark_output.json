@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "task_status": {
+      "type": "string",
+      "enum": ["COMPLETE", "INCOMPLETE", "BLOCKED"]
+    },
+    "summary": { "type": "string" },
+    "tests_run": { "type": "array", "items": { "type": "string" } },
+    "remaining_issues": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["task_status", "summary"]
+}
