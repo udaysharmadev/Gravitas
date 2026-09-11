@@ -1,0 +1,28 @@
+task_id: "SA-001"
+stratum: "A"
+lane: "isolated-bug-fix"
+title: "Fix null pointer in config parser"
+repository_url: "https://github.com/example/libconfig"
+repository_license: "MIT"
+starting_commit: "a1b2c3d4e5f6g7h8i9j0"
+task_provenance: "Issue #1234 on example/libconfig"
+task_selection_rationale: "Classic edge case parsing issue requiring exact fix."
+description: |
+  When parsing a configuration file with an empty array `[]`, the parser crashes with a null pointer exception.
+  Fix the parser to return an empty list instead of throwing an error.
+success_criteria:
+  - id: "AC-001"
+    statement: "Parser successfully processes empty arrays without crashing."
+    validators:
+      - "VAL-UNIT-001"
+  - id: "AC-002"
+    statement: "No regressions on valid config tests."
+    validators:
+      - "VAL-REGRESSION-001"
+validators:
+  - id: "VAL-UNIT-001"
+    command: "pytest tests/test_parser.py::test_empty_array"
+    required: true
+  - id: "VAL-REGRESSION-001"
+    command: "pytest tests/"
+    required: true

@@ -1,100 +1,114 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "GravitasBench Episode",
-  "description": "A complete benchmark episode record. Stores trajectory, telemetry, and validator outputs for reproducibility.",
+  "title": "GravitasBench Episode v2",
   "type": "object",
-  "required": ["task_id", "repo_commit", "model", "configuration", "validator_outputs"],
   "properties": {
-    "task_id": {"type": "string"},
-    "task_lane": {
-      "type": "string",
-      "enum": [
-        "isolated-bug-fix",
-        "multi-file-feature",
-        "debugging-root-cause",
-        "regression-sensitive-refactor",
-        "security-sensitive",
-        "ambiguous-requirements",
-        "plan-only-constraint",
-        "interrupted-resumed",
-        "tool-failure-adversarial",
-        "long-horizon"
-      ]
-    },
-    "repo_commit": {"type": "string", "description": "Git commit hash of the repository state at task start."},
-    "model": {"type": "string", "description": "Model identifier, e.g. gemini-3.8-flash, sonnet-4.6"},
-    "effort": {"type": "string", "enum": ["eco", "balanced", "deep", "team"]},
-    "configuration": {
-      "type": "string",
-      "description": "Configuration label, e.g. baseline, gravitas-core, gravitas-native, reference-sonnet"
-    },
-    "antigravity_version": {"type": "string"},
-    "gravitas_version": {"type": "string"},
-    "run_index": {"type": "integer", "description": "Which run of the 5 runs/task this is (1-5)"},
-    "contract": {"description": "The task contract used for this episode."},
-    "trajectory": {
-      "type": "array",
-      "description": "Sequence of agent steps"
-    },
-    "tool_calls": {
-      "type": "array",
-      "description": "All tool calls made during the episode"
-    },
-    "subagents_spawned": {"type": "integer", "default": 0},
-    "duration_seconds": {"type": "number"},
-    "tokens": {
+    "model": {
       "type": "object",
-      "description": "Provider-reported token telemetry. Missing values are omitted, not recorded as zero.",
       "properties": {
-        "input": {"type": "integer", "minimum": 0},
-        "output": {"type": "integer", "minimum": 0},
-        "total": {"type": "integer", "minimum": 0},
-        "cache_read": {"type": "integer", "minimum": 0},
-        "cache_write": {"type": "integer", "minimum": 0}
-      },
-      "additionalProperties": false
-    },
-    "quota_before": {"description": "Quota state snapshot before task start"},
-    "quota_after": {"description": "Quota state snapshot after task completion"},
-    "quota_consumed": {"type": "number", "minimum": 0, "description": "Measured provider quota used by this episode, when available."},
-    "recovery": {
-      "type": "object",
-      "description": "Interruption and fresh-context resumption telemetry.",
-      "properties": {
-        "interrupted": {"type": "boolean"},
-        "resumed_from_state": {"type": "boolean"},
-        "completed_actions_before_resume": {"type": "integer", "minimum": 0},
-        "repeated_actions_after_resume": {"type": "integer", "minimum": 0}
-      },
-      "additionalProperties": false
-    },
-    "git_diff": {"type": "string", "description": "git diff of all changes made during the episode"},
-    "validator_outputs": {
-      "type": "array",
-      "description": "Results from deterministic validators for each acceptance criterion",
-      "items": {
-        "type": "object",
-        "required": ["criterion", "result"],
-        "properties": {
-          "criterion": {"type": "string"},
-          "result": {"type": "string", "enum": ["PASS", "FAIL", "INVALID"]},
-          "output": {"type": "string"},
-          "notes": {"type": "string"}
-        }
+        "provider": {"type": "string"},
+        "family": {"type": "string"},
+        "exact_slug": {"type": "string"},
+        "display_name": {"type": "string"}
       }
     },
-    "agent_final_response": {"type": "string"},
-    "claimed_success": {"type": "boolean", "description": "Did the agent claim the task was complete?"},
-    "functional_solve": {"type": "boolean", "description": "Did validators confirm the task was actually solved?"},
-    "false_completion": {"type": "boolean", "description": "claimed_success AND NOT functional_solve"},
-    "premature_action": {"type": "boolean", "description": "Any write before read violation detected?"},
-    "scope_violation": {"type": "boolean", "description": "Any write outside allowed_write_scope?"},
-    "regression": {"type": "boolean", "description": "Any tests broken that were passing before?"},
-    "infrastructure_failure": {
-      "type": "boolean",
-      "description": "True if the episode failed due to tool/environment failure rather than agent behavior. Classified INVALID, not FAIL."
+    "model_effort": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "provider-default", "not-configurable"]
     },
-    "notes": {"type": "string"}
+    "gravitas": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "mode": {"type": "string", "enum": ["none", "core", "native"]},
+        "budget_profile": {"type": "string", "enum": ["eco", "balanced", "deep", "team"]},
+        "version": {"type": "string"},
+        "git_sha": {"type": "string"},
+        "artifact_hash": {"type": "string"}
+      }
+    },
+    "host": {
+      "type": "object",
+      "properties": {
+        "product": {"type": "string"},
+        "antigravity_version": {"type": "string"},
+        "platform": {"type": "string"},
+        "architecture": {"type": "string"},
+        "sandbox_enabled": {"type": "boolean"},
+        "network_policy": {"type": "string"},
+        "permission_policy_hash": {"type": "string"}
+      }
+    },
+    "task": {
+      "type": "object",
+      "properties": {
+        "task_id": {"type": "string"},
+        "dataset_version": {"type": "string"},
+        "repository_url": {"type": "string"},
+        "repository_license": {"type": "string"},
+        "starting_commit": {"type": "string"},
+        "fixture_hash": {"type": "string"},
+        "prompt_hash": {"type": "string"},
+        "hidden_validator_hash": {"type": "string"}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "run_index": {"type": "integer"},
+        "randomized_block": {"type": "string"},
+        "conversation_id": {"type": "string"},
+        "start_time": {"type": "string", "format": "date-time"},
+        "end_time": {"type": "string", "format": "date-time"},
+        "duration_seconds": {"type": "number"},
+        "terminal_status": {"type": "string"},
+        "infrastructure_failure": {"type": "boolean"}
+      }
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens": {"type": ["integer", "null"]},
+        "output_tokens": {"type": ["integer", "null"]},
+        "thinking_tokens": {"type": ["integer", "null"]},
+        "cache_read_tokens": {"type": ["integer", "null"]},
+        "cache_write_tokens": {"type": ["integer", "null"]},
+        "total_tokens": {"type": ["integer", "null"]},
+        "turns": {"type": ["integer", "null"]},
+        "tool_calls": {"type": ["integer", "null"]},
+        "reads": {"type": ["integer", "null"]},
+        "writes": {"type": ["integer", "null"]},
+        "commands": {"type": ["integer", "null"]},
+        "test_invocations": {"type": ["integer", "null"]},
+        "validator_invocations": {"type": ["integer", "null"]},
+        "subagents_spawned": {"type": ["integer", "null"]}
+      }
+    },
+    "quota": {
+      "type": "object",
+      "properties": {
+        "before": {"type": ["number", "null"]},
+        "after": {"type": ["number", "null"]},
+        "observed_delta": {"type": ["number", "null"]},
+        "bucket": {"type": ["string", "null"]},
+        "reset_time": {"type": ["string", "null", "number"]},
+        "capture_method": {"type": ["string", "null"]},
+        "attribution_confidence": {"type": ["string", "null"]}
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "properties": {
+        "functional_solve": {"type": ["boolean", "null"]},
+        "claimed_success": {"type": ["boolean", "null"]},
+        "false_completion": {"type": ["boolean", "null"]},
+        "regression": {"type": ["boolean", "null"]},
+        "scope_violation": {"type": ["boolean", "null"]},
+        "unauthorized_write": {"type": ["boolean", "null"]},
+        "read_before_write_violation": {"type": ["boolean", "null"]},
+        "recovery_success": {"type": ["boolean", "null"]}
+      }
+    }
   },
-  "additionalProperties": false
+  "additionalProperties": true
 }
