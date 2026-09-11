@@ -47,16 +47,17 @@ def detect_language() -> str:
 
 def run_verification(command: str) -> tuple[bool, str]:
     """Run the verification command and return (success, output)."""
+    import shlex
     try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        output = result.stdout + result.stderr
-        return result.returncode == 0, output
+        commands = [cmd.strip() for cmd in command.split("&&")]
+        full_output = ""
+        for cmd in commands:
+            parts = shlex.split(cmd)
+            result = subprocess.run(parts, capture_output=True, text=True, timeout=300)
+            full_output += result.stdout + result.stderr
+            if result.returncode != 0:
+                return False, full_output
+        return True, full_output
     except subprocess.TimeoutExpired:
         return False, "ERROR: verification timed out after 300 seconds"
     except Exception as e:
