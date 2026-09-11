@@ -1,0 +1,129 @@
+{
+  "BASELINE": {
+    "conversation_id": "8d5189a8-dd0f-4049-8e25-37c8628ce28a",
+    "model": "gemini-3.8-flash-medium",
+    "effort": "medium",
+    "host_execution_status": "SUCCESS",
+    "structured_task_status": "COMPLETE",
+    "agent_claimed_completion": true,
+    "pre_acceptance_result": false,
+    "post_acceptance_result": false,
+    "regression_result": "NOT_APPLICABLE_FOR_TASK_A",
+    "exact_changed_files": [],
+    "exact_diff_stats": "",
+    "tokens": {
+      "in": 109091,
+      "out": 9880,
+      "think": 8033,
+      "cache": 560509,
+      "total": 118971
+    },
+    "duration": 98.872253,
+    "turns": 1,
+    "tool_calls": 23,
+    "reads": 9,
+    "unique_files_read": 7,
+    "duplicate_read_ratio": 0.0,
+    "writes": 0,
+    "commands": 7,
+    "tests": 3,
+    "subagents": 0,
+    "hooks": {
+      "pre": 0,
+      "post": 0,
+      "stop": 0,
+      "stop_continue": 0,
+      "stop_allow": 0,
+      "denied_write": 0,
+      "errors": 0
+    },
+    "contamination_result": "PASS",
+    "raw_ndjson": "/tmp/gravitasbench/2e734e10-23c5-426a-907e-752f52166f2a/ws/out.ndjson"
+  },
+  "GRAVITAS_CORE": {
+    "conversation_id": "dc4f1851-a567-4a11-8a4e-1ffadf591a32",
+    "model": "gemini-3.8-flash-medium",
+    "effort": "medium",
+    "host_execution_status": "SUCCESS",
+    "structured_task_status": "COMPLETE",
+    "agent_claimed_completion": true,
+    "pre_acceptance_result": false,
+    "post_acceptance_result": true,
+    "regression_result": "NOT_APPLICABLE_FOR_TASK_A",
+    "exact_changed_files": [
+      "processor.py"
+    ],
+    "exact_diff_stats": "processor.py | 3 +--\n 1 file changed, 1 insertion(+), 2 deletions(-)",
+    "tokens": {
+      "in": 120181,
+      "out": 5501,
+      "think": 3329,
+      "cache": 621632,
+      "total": 125682
+    },
+    "duration": 76.031638,
+    "turns": 1,
+    "tool_calls": 24,
+    "reads": 9,
+    "unique_files_read": 7,
+    "duplicate_read_ratio": 0.12,
+    "writes": 1,
+    "commands": 10,
+    "tests": 3,
+    "subagents": 0,
+    "hooks": {
+      "pre": 0,
+      "post": 0,
+      "stop": 0,
+      "stop_continue": 0,
+      "stop_allow": 0,
+      "denied_write": 0,
+      "errors": 0
+    },
+    "contamination_result": "PASS",
+    "raw_ndjson": "/tmp/gravitasbench/a2f6d608-b3ea-4982-99ed-982b72c1303c/ws/out.ndjson"
+  },
+  "GRAVITAS_NATIVE": {
+    "conversation_id": "bf002ffd-a428-41b0-a7f1-77c629abea0a",
+    "model": "gemini-3.8-flash-medium",
+    "effort": "medium",
+    "host_execution_status": "SUCCESS",
+    "structured_task_status": "COMPLETE",
+    "agent_claimed_completion": true,
+    "pre_acceptance_result": false,
+    "post_acceptance_result": true,
+    "regression_result": "NOT_APPLICABLE_FOR_TASK_A",
+    "exact_changed_files": [
+      "processor.py"
+    ],
+    "exact_diff_stats": "processor.py | 3 +--\n 1 file changed, 1 insertion(+), 2 deletions(-)",
+    "tokens": {
+      "in": 208005,
+      "out": 8996,
+      "think": 5952,
+      "cache": 827688,
+      "total": 217001
+    },
+    "duration": 95.716641,
+    "turns": 1,
+    "tool_calls": 35,
+    "reads": 9,
+    "unique_files_read": 8,
+    "duplicate_read_ratio": 0.0,
+    "writes": 1,
+    "commands": 13,
+    "tests": 4,
+    "subagents": 0,
+    "hooks": {
+      "pre": 23,
+      "post": 9,
+      "stop": 1,
+      "stop_continue": 0,
+      "stop_allow": 1,
+      "denied_write": 0,
+      "errors": 0
+    },
+    "contamination_result": "PASS",
+    "raw_ndjson": "/tmp/gravitasbench/12ce13f6-497e-4ff3-8c4f-003ff9917025/ws/out.ndjson"
+  }
+}
