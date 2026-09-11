@@ -1,0 +1,16 @@
+name: Verify Skill
+
+on: [push, pull_request]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check Canonical Skill Divergence
+        run: |
+          diff skills/gravitas/SKILL.md .agents/skills/gravitas/SKILL.md
+          if [ $? -ne 0 ]; then
+            echo "ERROR: skills/gravitas/SKILL.md and .agents/skills/gravitas/SKILL.md diverge."
+            exit 1
+          fi
