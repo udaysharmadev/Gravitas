@@ -31,6 +31,11 @@ report only what the evidence supports.
 npx skills add udaysharmadev/Gravitas
 ```
 
+> **Note:** If you get a `403 Forbidden` error during installation, it usually means your local `.npmrc` is pointing to a private company registry. You can bypass it by forcing the public registry:
+> ```bash
+> npx --registry https://registry.npmjs.org/ skills add udaysharmadev/Gravitas
+> ```
+
 Then ask your coding agent:
 
 ```text
