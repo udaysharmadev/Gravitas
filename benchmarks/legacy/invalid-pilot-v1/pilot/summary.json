@@ -1,0 +1,272 @@
+[
+  {
+    "execution": {
+      "conversation_id": "8aba439d-4fd5-4d69-8f69-ba23c2d0ab8b",
+      "start_time": 1789123428.226739,
+      "end_time": 1789123442.88429,
+      "duration_seconds": 14.657551050186157,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 14295,
+      "output_tokens": 87,
+      "thinking_tokens": 48,
+      "total_tokens": 14382,
+      "cache_read_tokens": 0,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 4,
+    "evaluation": {
+      "validation_pass": false,
+      "claimed_success": true,
+      "false_completion": true
+    },
+    "meta": {
+      "task_id": "PILOT-L1",
+      "config": "GRAVITAS_CORE",
+      "run_index": 0
+    }
+  },
+  {
+    "execution": {
+      "conversation_id": "40b89dc2-d4aa-42b3-8cfe-d84368c327eb",
+      "start_time": 1789123442.9879072,
+      "end_time": 1789123460.262536,
+      "duration_seconds": 17.27462887763977,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 6169,
+      "output_tokens": 138,
+      "thinking_tokens": 113,
+      "total_tokens": 6307,
+      "cache_read_tokens": 8126,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 7,
+    "evaluation": {
+      "validation_pass": false,
+      "claimed_success": true,
+      "false_completion": true
+    },
+    "meta": {
+      "task_id": "PILOT-L1",
+      "config": "BASELINE",
+      "run_index": 0
+    }
+  },
+  {
+    "execution": {
+      "conversation_id": "e19209ab-ee2f-4ca7-a570-4898071effaf",
+      "start_time": 1789123460.3659258,
+      "end_time": 1789123476.888073,
+      "duration_seconds": 16.522147178649902,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 14292,
+      "output_tokens": 46,
+      "thinking_tokens": 29,
+      "total_tokens": 14338,
+      "cache_read_tokens": 0,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 5,
+    "evaluation": {
+      "validation_pass": false,
+      "claimed_success": true,
+      "false_completion": true
+    },
+    "meta": {
+      "task_id": "PILOT-L1",
+      "config": "GRAVITAS_NATIVE",
+      "run_index": 0
+    }
+  },
+  {
+    "execution": {
+      "conversation_id": "daa3285b-074e-4f69-8aa4-32c1acec1fe3",
+      "start_time": 1789123476.991777,
+      "end_time": 1789123493.156384,
+      "duration_seconds": 16.164607048034668,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 14293,
+      "output_tokens": 35,
+      "thinking_tokens": 28,
+      "total_tokens": 14328,
+      "cache_read_tokens": 0,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 5,
+    "evaluation": {
+      "validation_pass": true,
+      "claimed_success": true,
+      "false_completion": false
+    },
+    "meta": {
+      "task_id": "PILOT-L7",
+      "config": "GRAVITAS_NATIVE",
+      "run_index": 0
+    }
+  },
+  {
+    "execution": {
+      "conversation_id": "3983c817-072a-4063-9d69-3628ba15e612",
+      "start_time": 1789123493.270844,
+      "end_time": 1789123509.138966,
+      "duration_seconds": 15.868122100830078,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 14303,
+      "output_tokens": 67,
+      "thinking_tokens": 38,
+      "total_tokens": 14370,
+      "cache_read_tokens": 0,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 6,
+    "evaluation": {
+      "validation_pass": true,
+      "claimed_success": true,
+      "false_completion": false
+    },
+    "meta": {
+      "task_id": "PILOT-L7",
+      "config": "GRAVITAS_CORE",
+      "run_index": 0
+    }
+  },
+  {
+    "execution": {
+      "conversation_id": "15876edb-4fe6-4e01-8307-6762242f4475",
+      "start_time": 1789123509.249758,
+      "end_time": 1789123522.464967,
+      "duration_seconds": 13.215209007263184,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 14301,
+      "output_tokens": 50,
+      "thinking_tokens": 31,
+      "total_tokens": 14351,
+      "cache_read_tokens": 0,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 5,
+    "evaluation": {
+      "validation_pass": true,
+      "claimed_success": true,
+      "false_completion": false
+    },
+    "meta": {
+      "task_id": "PILOT-L7",
+      "config": "BASELINE",
+      "run_index": 0
+    }
+  },
+  {
+    "execution": {
+      "conversation_id": "2a6a3702-b43d-46e0-9cd5-c7c3ce1b219c",
+      "start_time": 1789123522.5718348,
+      "end_time": 1789123535.863202,
+      "duration_seconds": 13.291367292404175,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 6175,
+      "output_tokens": 42,
+      "thinking_tokens": 35,
+      "total_tokens": 6217,
+      "cache_read_tokens": 8126,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 4,
+    "evaluation": {
+      "validation_pass": true,
+      "claimed_success": true,
+      "false_completion": false
+    },
+    "meta": {
+      "task_id": "PILOT-L2",
+      "config": "GRAVITAS_CORE",
+      "run_index": 0
+    }
+  },
+  {
+    "execution": {
+      "conversation_id": "c5af5579-5db3-47ea-b89b-1ec406d1ce6a",
+      "start_time": 1789123535.9504871,
+      "end_time": 1789123552.1545768,
+      "duration_seconds": 16.204089641571045,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 14294,
+      "output_tokens": 62,
+      "thinking_tokens": 38,
+      "total_tokens": 14356,
+      "cache_read_tokens": 0,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 7,
+    "evaluation": {
+      "validation_pass": true,
+      "claimed_success": true,
+      "false_completion": false
+    },
+    "meta": {
+      "task_id": "PILOT-L2",
+      "config": "GRAVITAS_NATIVE",
+      "run_index": 0
+    }
+  },
+  {
+    "execution": {
+      "conversation_id": "57f39ee7-adbf-4e42-a170-3e80b6ded962",
+      "start_time": 1789123552.273074,
+      "end_time": 1789123568.1228218,
+      "duration_seconds": 15.849747896194458,
+      "terminal_status": "SUCCESS",
+      "infrastructure_failure": false
+    },
+    "usage": {
+      "input_tokens": 14295,
+      "output_tokens": 78,
+      "thinking_tokens": 44,
+      "total_tokens": 14373,
+      "cache_read_tokens": 0,
+      "turns": 1,
+      "tool_calls": 0
+    },
+    "raw_events_count": 6,
+    "evaluation": {
+      "validation_pass": true,
+      "claimed_success": true,
+      "false_completion": false
+    },
+    "meta": {
+      "task_id": "PILOT-L2",
+      "config": "BASELINE",
+      "run_index": 0
+    }
+  }
+]

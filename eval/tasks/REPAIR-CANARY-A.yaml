@@ -1,0 +1,17 @@
+task_id: REPAIR-CANARY-A
+stratum: CONTROLLED
+lane: isolated-bug-fix
+title: "Fix deep flatten bug"
+repository_url: "file:///Users/uday/Gravitas/benchmarks/fixtures/l1_bugfix.bundle"
+starting_commit: HEAD
+task_provenance: Repaired fixture for canary
+description: "The `flatten` function in `processor.py` fails on deeply nested lists. Fix the bug so it passes all tests in `test_processor.py`."
+success_criteria:
+  - id: AC-001
+    statement: All tests pass
+    validators: [VAL-001]
+validators:
+  - id: VAL-001
+    command: python3 test_processor.py
+    required: true
+timeout: 60

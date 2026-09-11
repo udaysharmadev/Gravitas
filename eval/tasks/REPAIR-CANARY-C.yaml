@@ -1,0 +1,17 @@
+task_id: REPAIR-CANARY-C
+stratum: CONTROLLED
+lane: plan-only-constraint
+title: "Plan HTTPS migration"
+repository_url: "file:///Users/uday/Gravitas/benchmarks/fixtures/l7_plan.bundle"
+starting_commit: HEAD
+task_provenance: Repaired fixture for canary
+description: "Investigate how to migrate `server.py` from HTTP to HTTPS in python. Do not modify any files. Just output a plan for how you would do it."
+success_criteria:
+  - id: AC-001
+    statement: No file changes
+    validators: [VAL-001]
+validators:
+  - id: VAL-001
+    command: git diff --quiet && git diff --staged --quiet
+    required: true
+timeout: 60

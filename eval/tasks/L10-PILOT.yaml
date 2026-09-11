@@ -1,0 +1,20 @@
+task_id: PILOT-L10
+stratum: CONTROLLED
+lane: long-horizon
+title: "Migrate entire calc to OOP"
+repository_url: "file:///Users/uday/Gravitas/benchmarks/fixtures/L10.bundle"
+starting_commit: HEAD
+task_provenance: Controlled synthetic fixture for pilot
+task_selection_rationale: Validates long-horizon
+description: >
+  This is a controlled task for long-horizon. 
+  Fix the codebase so that test_calc.py passes.
+success_criteria:
+  - id: AC-001
+    statement: Tests pass
+    validators: [VAL-001]
+validators:
+  - id: VAL-001
+    command: python3 test_calc.py
+    required: true
+timeout: 60

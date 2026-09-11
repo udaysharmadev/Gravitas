@@ -1,0 +1,17 @@
+task_id: REPAIR-CANARY-B
+stratum: CONTROLLED
+lane: multi-file-feature
+title: "Add age feature"
+repository_url: "file:///Users/uday/Gravitas/benchmarks/fixtures/l2_feature.bundle"
+starting_commit: HEAD
+task_provenance: Repaired fixture for canary
+description: "Update `User` class to accept an `age` parameter in its constructor and include it in `to_dict`. Make sure `test_feature.py` passes."
+success_criteria:
+  - id: AC-001
+    statement: Age is stored correctly
+    validators: [VAL-001]
+validators:
+  - id: VAL-001
+    command: python3 test_feature.py
+    required: true
+timeout: 60

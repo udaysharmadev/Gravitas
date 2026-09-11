@@ -1,0 +1,23 @@
+task_id: PILOT-L7
+stratum: CONTROLLED
+lane: plan-only-constraint
+title: "Plan how to add trig functions"
+repository_url: "file:///Users/uday/Gravitas/benchmarks/fixtures/L7.bundle"
+starting_commit: HEAD
+task_provenance: Controlled synthetic fixture for pilot
+task_selection_rationale: Validates plan-only-constraint
+description: >
+  This is a controlled task for plan-only-constraint. 
+  Fix the codebase so that test_calc.py passes.
+success_criteria:
+  - id: AC-001
+    statement: Tests pass
+    validators: [VAL-001]
+validators:
+  - id: VAL-001
+    command: python3 test_calc.py
+    required: true
+timeout: 60
+  - id: VAL-002
+    command: git diff --quiet && git diff --staged --quiet
+    required: true

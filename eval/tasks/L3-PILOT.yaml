@@ -1,0 +1,20 @@
+task_id: PILOT-L3
+stratum: CONTROLLED
+lane: debugging-root-cause
+title: "Find why division by zero isn't handled"
+repository_url: "file:///Users/uday/Gravitas/benchmarks/fixtures/L3.bundle"
+starting_commit: HEAD
+task_provenance: Controlled synthetic fixture for pilot
+task_selection_rationale: Validates debugging-root-cause
+description: >
+  This is a controlled task for debugging-root-cause. 
+  Fix the codebase so that test_calc.py passes.
+success_criteria:
+  - id: AC-001
+    statement: Tests pass
+    validators: [VAL-001]
+validators:
+  - id: VAL-001
+    command: python3 test_calc.py
+    required: true
+timeout: 60
