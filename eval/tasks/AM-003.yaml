@@ -1,0 +1,23 @@
+task_id: "AM-003"
+title: "The tests are flaky, fix them"
+category: ambiguous
+tier: 2
+pillars_tested: [1, 2, 5, 7, 10]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  Some tests fail intermittently. They pass sometimes and fail
+  other times. Fix the flaky tests.
+success_criteria:
+  - "Agent identifies which tests are flaky"
+  - "Agent identifies the root cause of flakiness"
+  - "Tests pass consistently (10+ runs)"
+  - "No test logic changes that reduce coverage"
+scoring_rubric:
+  recon_quality: "Did agent run tests multiple times to reproduce flakiness?"
+  plan_quality: "Was there a plan with root cause analysis?"
+  diff_discipline: "Were fixes scoped to the flaky tests?"
+  evidence: "Were tests run multiple times to verify stability?"
+  adversarial_qa: "Did agent test timing, ordering, and shared state?"
+  reporting: "Did agent lead with root cause and evidence of stability?"
+tags: [ambiguous, flaky-tests, reliability, testing]

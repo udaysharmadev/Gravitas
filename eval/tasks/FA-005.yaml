@@ -1,0 +1,26 @@
+task_id: "FA-005"
+title: "Add configurable cache with TTL support"
+category: feature-addition
+tier: 2
+pillars_tested: [1, 2, 3, 4, 5, 6, 7]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  Add an in-memory cache with configurable TTL (time-to-live) for
+  API responses. Cache key should be based on request path and
+  query parameters. Cache should be bypassed for authenticated
+  requests. TTL should be configurable per endpoint.
+success_criteria:
+  - "Cache stores API responses with configurable TTL"
+  - "Cache key is based on path + query params"
+  - "Authenticated requests bypass cache"
+  - "TTL is configurable per endpoint"
+  - "Existing tests pass"
+  - "New tests cover cache hit, miss, expiry, and bypass"
+scoring_rubric:
+  recon_quality: "Did agent read the routing layer, auth middleware, and response patterns?"
+  plan_quality: "Was there a plan with cache strategy, key design, and TTL configuration?"
+  diff_discipline: "Was the cache layer added without modifying existing endpoint logic?"
+  evidence: "Were tests run and passing after implementation?"
+  adversarial_qa: "Did agent test cache hit, miss, expiry, concurrent access, and auth bypass?"
+tags: [caching, ttl, performance, api]

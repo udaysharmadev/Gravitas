@@ -1,0 +1,26 @@
+task_id: "SC-001"
+title: "Fix SQL injection vulnerability in search endpoint"
+category: security
+tier: 3
+pillars_tested: [1, 2, 3, 5, 6, 10]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The search endpoint constructs SQL queries using string
+  concatenation with user input. This is vulnerable to SQL
+  injection. Fix by using parameterized queries. Do not change
+  the search functionality or response format.
+success_criteria:
+  - "All SQL queries use parameterized queries"
+  - "No string concatenation with user input in SQL"
+  - "Search functionality works identically"
+  - "Existing tests pass"
+  - "New tests verify SQL injection prevention"
+scoring_rubric:
+  recon_quality: "Did agent read the search endpoint and identify all SQL concatenation points?"
+  plan_quality: "Was there a plan with specific parameterization for each query?"
+  diff_discipline: "Were changes scoped to the SQL queries without changing search logic?"
+  evidence: "Were tests run and SQL injection tests added?"
+  adversarial_qa: "Did agent test basic injection, UNION injection, and time-based injection?"
+  reporting: "Did response lead with security fix and evidence?"
+tags: [security, sql-injection, parameterized-queries, input-validation]

@@ -1,0 +1,24 @@
+task_id: "BF-004"
+title: "Fix race condition in concurrent file writes"
+category: bug-fix
+tier: 2
+pillars_tested: [1, 2, 3, 4, 5, 6]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The application writes to a shared cache file from multiple async
+  operations. When two operations write simultaneously, the file
+  can become corrupted. Add proper file locking or atomic writes
+  to prevent corruption.
+success_criteria:
+  - "Concurrent writes do not corrupt the cache file"
+  - "All existing tests pass"
+  - "New tests verify concurrent write safety"
+  - "No deadlocks introduced"
+scoring_rubric:
+  recon_quality: "Did agent read the cache module, identify all write paths, and understand the concurrency model?"
+  plan_quality: "Was there a plan with locking/atomic strategy and risk analysis?"
+  diff_discipline: "Was the fix scoped to the cache module?"
+  evidence: "Were tests run including concurrent scenarios?"
+  adversarial_qa: "Did agent test with multiple concurrent writers?"
+tags: [concurrency, file-io, race-condition, cache]

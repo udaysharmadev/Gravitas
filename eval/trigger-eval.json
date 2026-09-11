@@ -1,0 +1,31 @@
+{
+  "description": "Gravitas v4 trigger evaluation. Tests whether the skill activates on intended tasks and does not activate on unintended tasks.",
+  "version": "4.0.0",
+  "target_activation_rate": 0.95,
+  "target_false_positive_rate": 0.05,
+  "intended_activations": [
+    {"input": "implement cursor pagination for the posts endpoint", "expect": true},
+    {"input": "fix the login timeout bug", "expect": true},
+    {"input": "refactor the auth middleware to use async/await", "expect": true},
+    {"input": "debug why the tests are failing on CI", "expect": true},
+    {"input": "add input validation to the user creation endpoint", "expect": true},
+    {"input": "migrate the database schema to add the created_at column", "expect": true},
+    {"input": "review this pull request and identify issues", "expect": true},
+    {"input": "research how cursor pagination is typically implemented", "expect": true},
+    {"input": "build a new authentication service", "expect": true},
+    {"input": "delete the deprecated API endpoints", "expect": true},
+    {"input": "write tests for the user service", "expect": true},
+    {"input": "optimize the database queries in the report generator", "expect": true},
+    {"input": "update the dependency versions in package.json", "expect": true},
+    {"input": "analyze why memory usage is increasing over time", "expect": true},
+    {"input": "design the new notification system architecture", "expect": true}
+  ],
+  "non_activations": [
+    {"input": "what is the capital of France?", "expect": false},
+    {"input": "explain how TCP/IP works", "expect": false},
+    {"input": "translate this text to Spanish", "expect": false},
+    {"input": "write a poem about software engineering", "expect": false},
+    {"input": "what are your capabilities?", "expect": false}
+  ],
+  "notes": "Non-activations are harder to enforce via description-based triggering. The key requirement is that intended activations reach >95%. False positives on non-engineering tasks are acceptable since the skill adds discipline without breaking non-technical tasks."
+}

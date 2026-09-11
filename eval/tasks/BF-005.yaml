@@ -1,0 +1,24 @@
+task_id: "BF-005"
+title: "Fix memory leak in event listener registration"
+category: bug-fix
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The application leaks memory when components mount and unmount
+  repeatedly. Event listeners are registered on mount but never
+  removed on unmount. Fix the cleanup without changing the
+  listener behavior.
+success_criteria:
+  - "Event listeners are removed on component unmount"
+  - "Memory usage stabilizes after repeated mount/unmount cycles"
+  - "All existing tests pass"
+  - "New tests verify cleanup"
+scoring_rubric:
+  recon_quality: "Did agent read the component lifecycle and identify all listener registrations?"
+  plan_quality: "Was there a plan identifying each listener that needs cleanup?"
+  diff_discipline: "Was cleanup added without changing listener behavior?"
+  evidence: "Were tests run and passing after the fix?"
+  adversarial_qa: "Did agent verify no double-removal or missing removal?"
+tags: [memory-leak, event-listeners, lifecycle, cleanup]

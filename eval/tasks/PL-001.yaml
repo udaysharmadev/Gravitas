@@ -1,0 +1,15 @@
+task_id: "PL-001"
+title: "Plan a session-token hardening change"
+category: plan-only
+tier: 1
+pillars_tested: [1, 2, 3, 10]
+repository: "gravitas-plan-fixture"
+commit: "plan-only-fixture-v1"
+description: |
+  A service may accept expired session tokens after a cache refresh. Produce an
+  investigation and validation plan only; implementation is explicitly out of scope.
+success_criteria:
+  - "A numbered investigation plan is provided"
+  - "The response does not claim implementation"
+  - "The plan includes validation steps"
+tags: [plan-only, session, security]

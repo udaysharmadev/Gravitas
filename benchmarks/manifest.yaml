@@ -1,0 +1,127 @@
+# GravitasBench Task Manifest
+# Version: 1.0
+# Status: registry-only -- fixture repositories and hidden validators pending
+
+meta:
+  version: "1.0"
+  status: "registry-only"
+  last_updated: "2026-09-11"
+  task_count: 30
+  target_task_count: 30
+  runs_per_config: 5
+
+lanes:
+  L1:
+    name: isolated-bug-fix
+    description: Single-file bug fix with clear root cause
+    target_count: 3
+    tasks: [BF-001, BF-002, BF-003]
+
+  L2:
+    name: multi-file-feature
+    description: Feature implementation touching 2+ files with clear acceptance criteria
+    target_count: 3
+    tasks: [FA-001, FA-002, FA-003]
+
+  L3:
+    name: debugging-root-cause
+    description: Diagnosis of a failure with non-obvious root cause
+    target_count: 3
+    tasks: [BF-004, BF-005, DB-001]
+
+  L4:
+    name: regression-sensitive-refactor
+    description: Refactor with existing test suite that must not regress
+    target_count: 3
+    tasks: [RF-001, RF-002, RF-003]
+
+  L5:
+    name: security-sensitive
+    description: Security-affecting change (SQL injection, auth, input validation)
+    target_count: 3
+    tasks: [SC-001, SC-002, SC-003]
+
+  L6:
+    name: ambiguous-requirements
+    description: Task with underspecified requirements requiring clarification or assumption
+    target_count: 3
+    tasks: [AM-001, AM-002, AM-003]
+
+  L7:
+    name: plan-only-constraint
+    description: Explicit plan-only mode -- agent must not implement
+    target_count: 3
+    tasks: [PL-001, PL-002, PL-003]
+
+  L8:
+    name: interrupted-resumed
+    description: Task interrupted halfway, resumed in fresh context
+    target_count: 3
+    tasks: [SM-001, SM-002, SM-003]
+
+  L9:
+    name: tool-failure-adversarial
+    description: Task where tools fail or return unexpected results
+    target_count: 3
+    tasks: [UI-002, UI-003, FA-004]
+
+  L10:
+    name: long-horizon
+    description: Multi-session task requiring persistent state
+    target_count: 3
+    tasks: [FA-005, LH-001, UI-001]
+
+configurations:
+  - id: baseline-flash
+    model: gemini-3.8-flash
+    effort: balanced
+    gravitas: none
+    label: Baseline (Gemini 3.8 Flash)
+
+  - id: gravitas-core-flash
+    model: gemini-3.8-flash
+    effort: balanced
+    gravitas: skill-only
+    label: Gravitas Core (SKILL.md only)
+
+  - id: gravitas-native-flash
+    model: gemini-3.8-flash
+    effort: balanced
+    gravitas: full
+    label: Gravitas Native (hooks + skill)
+
+  - id: baseline-flash-37
+    model: gemini-3.7-flash
+    effort: balanced
+    gravitas: none
+    label: Baseline (Gemini 3.7 Flash)
+
+  - id: gravitas-flash-37
+    model: gemini-3.7-flash
+    effort: balanced
+    gravitas: full
+    label: Gravitas (Gemini 3.7 Flash)
+
+  - id: baseline-pro
+    model: gemini-3.1-pro
+    effort: high
+    gravitas: none
+    label: Baseline (Gemini 3.1 Pro)
+
+  - id: gravitas-pro
+    model: gemini-3.1-pro
+    effort: high
+    gravitas: full
+    label: Gravitas (Gemini 3.1 Pro)
+
+  - id: reference-sonnet
+    model: sonnet-4.6
+    effort: thinking
+    gravitas: none
+    label: Reference (Sonnet 4.6)
+
+  - id: reference-opus
+    model: opus-4.6
+    effort: thinking
+    gravitas: none
+    label: Reference (Opus 4.6)

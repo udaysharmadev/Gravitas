@@ -1,0 +1,48 @@
+name: GRAVITAS Verify
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  gravitas-verify:
+    name: GRAVITAS Verification Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install package and benchmark validator dependencies
+        run: python -m pip install . -r benchmarks/runner/requirements.txt
+
+      - name: Run unit and runtime tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Audit schemas, manifest, hooks, and claims
+        run: python benchmarks/runner/audit.py
+
+      - name: Validate benchmark fixtures
+        run: python benchmarks/runner/validate.py --episodes benchmarks/results
+
+      - name: Compile native hook scripts
+        run: python -m py_compile gravitas_cli.py plugins/gravitas-antigravity/scripts/*.py
+
+      - name: Smoke-test installed CLI
+        run: gravitas doctor
+
+      - name: Validate portable skill structure
+        run: python .github/scripts/validate_skill.py
+
+      - name: Verify Antigravity activation copy
+        run: diff -qr --exclude 'SKILL.v3.md' --exclude '__pycache__' skills/gravitas .agents/skills/gravitas
+
+      - name: Success
+        run: 'echo "VERDICT: PASS — all checks clean"'

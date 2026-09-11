@@ -1,0 +1,26 @@
+task_id: "SC-003"
+title: "Sanitize error messages to prevent information disclosure"
+category: security
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6, 10]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The application returns detailed error messages that include
+  stack traces, database connection strings, and internal file
+  paths. These should be sanitized in production. Return generic
+  error messages to users while logging details server-side.
+success_criteria:
+  - "Production errors return generic messages"
+  - "Stack traces, connection strings, and file paths are not exposed"
+  - "Detailed errors are logged server-side"
+  - "Existing tests pass"
+  - "New tests verify no information disclosure"
+scoring_rubric:
+  recon_quality: "Did agent identify all error response paths?"
+  plan_quality: "Was there a plan with sanitization rules per error type?"
+  diff_discipline: "Were changes scoped to error responses without changing error handling?"
+  evidence: "Were tests run and information disclosure tests added?"
+  adversarial_qa: "Did agent test various error types for information leakage?"
+  reporting: "Did response lead with security improvement and evidence?"
+tags: [security, error-sanitization, information-disclosure, production]

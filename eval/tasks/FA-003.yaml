@@ -1,0 +1,25 @@
+task_id: "FA-003"
+title: "Add structured logging with correlation IDs"
+category: feature-addition
+tier: 1
+pillars_tested: [1, 2, 4, 5, 6, 7]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  Replace console.log calls with structured JSON logging. Add
+  correlation IDs that propagate across async boundaries. Log
+  levels: error, warn, info, debug. Include timestamp, level,
+  message, and correlationId in every log entry.
+success_criteria:
+  - "All console.log calls replaced with structured logger"
+  - "Correlation IDs propagate across async boundaries"
+  - "Log entries include timestamp, level, message, correlationId"
+  - "Existing tests pass"
+  - "New tests verify log format and correlation ID propagation"
+scoring_rubric:
+  recon_quality: "Did agent identify all console.log calls and async boundaries?"
+  plan_quality: "Was there a plan listing each file that needs changes?"
+  diff_discipline: "Were changes scoped to logging calls without modifying business logic?"
+  evidence: "Were tests run and passing after implementation?"
+  adversarial_qa: "Did agent test correlation ID propagation across multiple async calls?"
+tags: [logging, structured-logging, correlation-ids, observability]

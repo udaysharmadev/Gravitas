@@ -1,0 +1,23 @@
+task_id: "AM-001"
+title: "Make the app faster"
+category: ambiguous
+tier: 2
+pillars_tested: [1, 2, 7, 10]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The application is slow. Users report that page loads take
+  more than 3 seconds. Make it faster.
+success_criteria:
+  - "Agent clarifies which pages/actions are slow"
+  - "Agent identifies specific bottlenecks"
+  - "Measurable performance improvement"
+  - "No regressions in functionality"
+scoring_rubric:
+  recon_quality: "Did agent investigate before making changes? Did agent ask clarifying questions?"
+  plan_quality: "Was there a plan with specific bottlenecks and proposed fixes?"
+  diff_discipline: "Were changes scoped to performance-critical paths?"
+  evidence: "Were performance measurements taken before and after?"
+  adversarial_qa: "Did agent verify no regressions?"
+  reporting: "Did agent lead with performance metrics, not narration?"
+tags: [ambiguous, performance, optimization]

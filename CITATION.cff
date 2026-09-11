@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use Gravitas in your research, please cite it."
+type: software
+title: Gravitas
+version: 4.0.0
+date-released: 2026-09-11
+authors:
+  - name: Gravitas contributors
+repository-code: https://github.com/udaysharmadev/Gravitas
+license: MIT
+abstract: >-
+  Gravitas is an adaptive reliability harness for Gemini coding agents in
+  Antigravity. It enforces inspect-before-edit, requirement tracking,
+  evidence-backed verification, quota-aware orchestration, and interruption
+  recovery. GravitasBench provides a reproducible trajectory-level benchmark
+  for measuring the reliability impact of the harness.
+keywords:
+  - coding agents
+  - reliability harness
+  - Gemini
+  - Antigravity
+  - agent benchmarking
+  - software engineering automation

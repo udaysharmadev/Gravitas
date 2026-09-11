@@ -1,0 +1,23 @@
+task_id: "BF-002"
+title: "Fix off-by-one error in pagination"
+category: bug-fix
+tier: 1
+pillars_tested: [1, 2, 4, 5, 6]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The pagination for the /api/users endpoint returns one fewer item
+  than expected on pages after the first. The limit parameter appears
+  to be off by one. Investigate and fix.
+success_criteria:
+  - "Pagination returns correct number of items on all pages"
+  - "Edge cases handled (page 1, last page, empty results)"
+  - "Existing tests pass"
+  - "New tests cover pagination boundary"
+scoring_rubric:
+  recon_quality: "Did agent read the pagination logic and existing tests?"
+  plan_quality: "Was there a plan with specific files and line numbers?"
+  diff_discipline: "Was the fix minimal (1-5 lines)?"
+  evidence: "Were tests run and passing after the fix?"
+  adversarial_qa: "Did agent test page 1, last page, empty results?"
+tags: [pagination, api, off-by-one]

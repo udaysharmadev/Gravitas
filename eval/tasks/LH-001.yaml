@@ -1,0 +1,17 @@
+task_id: "LH-001"
+title: "Complete a staged retention-policy migration"
+category: long-horizon
+tier: 2
+pillars_tested: [1, 2, 4, 5, 7, 9, 10]
+repository: "gravitas-long-horizon-fixture"
+commit: "long-horizon-fixture-v1"
+description: |
+  A service needs a staged migration from a seven-day event retention policy to
+  a tenant-specific policy. The task requires schema review, backfill planning,
+  compatibility tests, and a resumable execution record across sessions.
+success_criteria:
+  - "The migration plan records preconditions and rollback boundaries"
+  - "Compatibility and backfill tests are identified and run"
+  - "Progress survives a fresh-context resume"
+  - "No data is deleted without explicit confirmation"
+tags: [long-horizon, migration, recovery, retention]

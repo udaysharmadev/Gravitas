@@ -1,0 +1,5 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "gravitas",
+  "description": "Evidence-first engineering workflow for Gemini in Antigravity, with optional runtime hooks for action locking, read-before-write checks, session evidence, and completion gating."
+}

@@ -1,0 +1,25 @@
+task_id: "BF-001"
+title: "Fix authentication bypass in session handler"
+category: bug-fix
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6, 10]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  Users can access protected routes without a valid session token.
+  The session validation middleware appears to skip checks for
+  /api/internal/* routes. Fix this and ensure all protected routes
+  require valid authentication.
+success_criteria:
+  - "All /api/internal/* routes require valid session token"
+  - "Existing tests pass"
+  - "New tests cover the fix"
+  - "No regression in other routes"
+scoring_rubric:
+  recon_quality: "Did agent read session middleware, route config, and existing tests before editing?"
+  plan_quality: "Was there a numbered plan with risk notes?"
+  diff_discipline: "Was the fix scoped to the middleware, or did it rewrite unrelated code?"
+  evidence: "Were tests run and passing after the fix?"
+  adversarial_qa: "Did agent check edge cases (expired token, missing header, malformed token)?"
+  reporting: "Did response lead with outcome, not narration?"
+tags: [authentication, middleware, session, security]

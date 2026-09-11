@@ -1,0 +1,24 @@
+task_id: "SM-003"
+title: "Add database index for slow query"
+category: schema-migration
+tier: 2
+pillars_tested: [1, 2, 3, 5, 6]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The query SELECT * FROM orders WHERE user_id = ? AND status = 'pending'
+  ORDER BY created_at DESC is slow (full table scan). Add an
+  appropriate index. The orders table has 1M+ rows. The index
+  should not impact write performance significantly.
+success_criteria:
+  - "Index added for the slow query"
+  - "Query plan shows index usage"
+  - "Write performance not significantly degraded"
+  - "All existing tests pass"
+scoring_rubric:
+  recon_quality: "Did agent read the schema, query plan, and existing indexes?"
+  plan_quality: "Was there a plan with index design and write-impact analysis?"
+  diff_discipline: "Was the index addition minimal?"
+  evidence: "Were tests run and query plan verified?"
+  adversarial_qa: "Did agent verify query plan uses the new index?"
+tags: [database, index, performance, query-optimization]

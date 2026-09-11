@@ -1,0 +1,17 @@
+task_id: "DB-001"
+title: "Diagnose an intermittent payment reconciliation failure"
+category: debugging-root-cause
+tier: 2
+pillars_tested: [1, 2, 4, 5, 7, 10]
+repository: "gravitas-debug-fixture"
+commit: "debug-fixture-v1"
+description: |
+  Nightly reconciliation sometimes records a completed payment twice. The
+  failure appears only after a worker retry and is not reproduced by the unit
+  test suite. Identify the likely root cause and propose a scoped fix.
+success_criteria:
+  - "The retry path and idempotency boundary are inspected before editing"
+  - "The root cause is supported by observed evidence"
+  - "A regression test covers the duplicate-payment path"
+  - "Existing reconciliation behavior remains intact"
+tags: [debugging, retries, idempotency, payments]

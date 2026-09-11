@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Gravitas Evidence Entry",
+  "description": "A runtime event or criterion-linked proof in the append-only evidence ledger.",
+  "type": "object",
+  "required": ["source", "timestamp"],
+  "properties": {
+    "criterion": {"type": "string", "description": "Acceptance criterion satisfied by this evidence."},
+    "evidence": {"type": "string", "description": "Observed evidence, preferably including verbatim validator output."},
+    "source": {
+      "type": "string",
+      "enum": [
+        "test_run", "lint", "type_check", "build", "diff", "static_analysis",
+        "validator", "self_review", "read", "write"
+      ]
+    },
+    "tool_call_id": {"type": "string"},
+    "file": {"type": "string", "description": "Path associated with a read or write event."},
+    "command": {"type": ["string", "array"], "items": {"type": "string"}},
+    "validator_id": {"type": "string"},
+    "criterion_ids": {"type": "array", "items": {"type": "string"}},
+    "exit_code": {"type": "integer"},
+    "command_sha256": {"type": "string"},
+    "stdout_sha256": {"type": "string"},
+    "stderr_sha256": {"type": "string"},
+    "working_tree_sha256": {"type": "string"},
+    "git_head": {"type": ["string", "null"]},
+    "duration_ms": {"type": "integer", "minimum": 0},
+    "previous_event_hash": {"type": ["string", "null"]},
+    "event_hash": {"type": "string"},
+    "success": {"type": "boolean"},
+    "output_snippet": {
+      "type": "string",
+      "description": "Bounded diagnostic output; must be scrubbed of credentials and personal data."
+    },
+    "timestamp": {"type": "string", "format": "date-time"},
+    "verdict": {"type": "string", "enum": ["PASS", "FAIL", "CONDITIONAL_PASS", "PENDING"]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"source": {"enum": ["read", "write"]}}, "required": ["source"]},
+      "then": {"required": ["file"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "enum": [
+              "test_run", "lint", "type_check", "build", "diff",
+              "static_analysis", "validator", "self_review"
+            ]
+          }
+        },
+        "required": ["source"]
+      },
+      "then": {"required": ["evidence", "verdict"]}
+    },
+    {
+      "if": {"properties": {"source": {"const": "validator"}}, "required": ["source"]},
+      "then": {"required": ["validator_id", "criterion_ids", "exit_code", "command_sha256", "stdout_sha256", "stderr_sha256", "working_tree_sha256", "event_hash"]}
+    }
+  ],
+  "additionalProperties": false
+}

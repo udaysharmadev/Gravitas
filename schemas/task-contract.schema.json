@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Gravitas Task Contract",
+  "description": "Machine-readable task contract for Gravitas v4. Defines mode, objective, acceptance criteria, scope and budget.",
+  "type": "object",
+  "required": ["mode", "objective"],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["answer", "research", "plan-only", "review-only", "debug", "implement", "migration", "security-review"],
+      "description": "Execution mode. Read-only modes (answer/research/plan-only/review-only/security-review) block all write operations at hook level."
+    },
+    "objective": {
+      "type": "string",
+      "description": "Plain-language description of what this task should accomplish."
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string"},
+          {
+            "type": "object",
+            "required": ["id", "statement"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+              "statement": {"type": "string", "minLength": 1},
+              "validators": {"type": "array", "items": {"type": "string"}, "default": []}
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "description": "Verifiable outcomes. Structured entries bind a stable criterion ID to its statement and validator IDs; strings remain supported for v4 compatibility."
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Explicit non-goals. Used to prevent scope creep."
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "default": "medium"
+    },
+    "budget": {
+      "type": "string",
+      "enum": ["eco", "balanced", "deep", "team"],
+      "default": "balanced",
+      "description": "Orchestration budget profile. Controls recon depth, delegation threshold, and verification scope."
+    },
+    "allowed_write_scope": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "File paths or directory prefixes where writes are permitted. Empty array means full repository scope. PreToolUse hook enforces this."
+    },
+    "verification": {
+      "type": "string",
+      "enum": ["none", "targeted", "affected", "full"],
+      "default": "targeted",
+      "description": "Verification scope. Targeted: run tests for changed modules only. Affected: run all tests for changed and dependent modules. Full: complete test suite."
+    },
+    "required_validators": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "default": [],
+      "description": "Legacy command-fragment migration field. Prefer named validators, which bind completion to Gravitas-owned exit-code records."
+    },
+    "validators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "command"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+          "command": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "criterion_ids": {"type": "array", "items": {"type": "string"}, "default": []}
+        },
+        "additionalProperties": false
+      },
+      "default": [],
+      "description": "Named validators for Gravitas-owned execution. Completion accepts only their captured exit-code records."
+    },
+    "task_id": {
+      "type": "string",
+      "description": "Optional unique ID for session ledger path. Auto-generated if not provided."
+    }
+  },
+  "additionalProperties": false
+}

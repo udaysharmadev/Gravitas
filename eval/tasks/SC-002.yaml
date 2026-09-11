@@ -1,0 +1,26 @@
+task_id: "SC-002"
+title: "Add CSRF protection to state-changing endpoints"
+category: security
+tier: 3
+pillars_tested: [1, 2, 3, 5, 6, 10]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The application has no CSRF protection. State-changing endpoints
+  (POST, PUT, DELETE) can be exploited by cross-site requests.
+  Add CSRF token validation to all state-changing endpoints. Use
+  the synchronizer token pattern.
+success_criteria:
+  - "CSRF tokens generated and included in forms"
+  - "All state-changing endpoints validate CSRF tokens"
+  - "GET requests are not affected"
+  - "Existing tests pass"
+  - "New tests verify CSRF protection"
+scoring_rubric:
+  recon_quality: "Did agent read the routing layer, middleware, and form templates?"
+  plan_quality: "Was there a plan with token generation, validation, and form integration?"
+  diff_discipline: "Was CSRF added as middleware without modifying endpoint logic?"
+  evidence: "Were tests run and CSRF tests added?"
+  adversarial_qa: "Did agent test cross-site requests, missing tokens, and expired tokens?"
+  reporting: "Did response lead with security fix and evidence?"
+tags: [security, csrf, token-validation, middleware]

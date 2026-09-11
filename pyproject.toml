@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gravitas"
+version = "4.0.0"
+description = "Gravitas reliability harness for Antigravity"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "jsonschema>=4.0.0",
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+gravitas = "gravitas_cli:main"
+
+[tool.setuptools]
+py-modules = ["gravitas_cli"]

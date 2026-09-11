@@ -1,0 +1,13 @@
+.gravitas/
+*.DS_Store
+.DS_Store
+/.agents/skills/ponytail*/
+/skills/ponytail*/
+__pycache__/
+.venv/
+# Keep reproducible, non-sensitive smoke fixtures in Git for CI. Real benchmark
+# trajectories remain ignored until they have passed privacy and release review.
+benchmarks/results/*.json
+!benchmarks/results/*-smoke*.json
+*.DS_Store
+.DS_Store

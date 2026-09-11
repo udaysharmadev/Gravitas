@@ -1,0 +1,23 @@
+task_id: "AM-002"
+title: "Improve the error handling"
+category: ambiguous
+tier: 1
+pillars_tested: [1, 2, 7, 10]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The error handling in the application is not great. Improve it.
+success_criteria:
+  - "Agent clarifies what 'not great' means"
+  - "Agent identifies specific error handling gaps"
+  - "Errors are handled consistently"
+  - "Existing tests pass"
+  - "New tests cover error scenarios"
+scoring_rubric:
+  recon_quality: "Did agent investigate current error handling before changing?"
+  plan_quality: "Was there a plan with specific improvements?"
+  diff_discipline: "Were changes scoped to error handling paths?"
+  evidence: "Were tests run and passing after changes?"
+  adversarial_qa: "Did agent test error scenarios?"
+  reporting: "Did agent lead with what changed, not what was wrong?"
+tags: [ambiguous, error-handling, consistency]

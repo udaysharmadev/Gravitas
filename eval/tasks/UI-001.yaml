@@ -1,0 +1,25 @@
+task_id: "UI-001"
+title: "Add loading spinner to data fetch component"
+category: ui-change
+tier: 1
+pillars_tested: [1, 2, 4, 5, 7, 9]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The UserList component shows a blank screen while data is loading.
+  Add a loading spinner that displays while the API call is in
+  progress. Use the existing Spinner component from the design system.
+success_criteria:
+  - "Spinner displays while data is loading"
+  - "Spinner disappears when data arrives"
+  - "Spinner disappears on error"
+  - "Existing tests pass"
+  - "Visual verification confirms spinner appears"
+scoring_rubric:
+  recon_quality: "Did agent read the component, its data fetching, and the Spinner component?"
+  plan_quality: "Was there a plan with specific component changes?"
+  diff_discipline: "Was the spinner added without modifying the data fetching logic?"
+  evidence: "Were tests run and visual verification performed?"
+  adversarial_qa: "Did agent test loading, loaded, and error states?"
+  reporting: "Did response lead with outcome and visual verification?"
+tags: [ui, loading, spinner, component]

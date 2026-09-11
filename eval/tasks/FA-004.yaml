@@ -1,0 +1,26 @@
+task_id: "FA-004"
+title: "Add input sanitization for user-generated content"
+category: feature-addition
+tier: 2
+pillars_tested: [1, 2, 3, 4, 5, 6, 10]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  Add input sanitization for all user-generated content fields.
+  Sanitize HTML entities, script tags, and SQL injection patterns.
+  Apply to all text fields in forms and API endpoints. Do not
+  modify the stored data format.
+success_criteria:
+  - "All user-generated text fields are sanitized"
+  - "HTML entities are escaped"
+  - "Script tags are stripped"
+  - "SQL injection patterns are neutralized"
+  - "Existing tests pass"
+  - "New tests cover sanitization for each attack vector"
+scoring_rubric:
+  recon_quality: "Did agent identify all user input points and existing sanitization?"
+  plan_quality: "Was there a plan with specific sanitization rules per field type?"
+  diff_discipline: "Was sanitization added without changing the stored data format?"
+  evidence: "Were tests run and passing after implementation?"
+  adversarial_qa: "Did agent test XSS, SQL injection, and HTML entity attacks?"
+tags: [sanitization, security, xss, sql-injection, input-validation]

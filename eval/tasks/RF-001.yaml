@@ -1,0 +1,26 @@
+task_id: "RF-001"
+title: "Extract shared validation logic into utility module"
+category: refactor
+tier: 1
+pillars_tested: [1, 2, 4, 5, 6, 7]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The email validation logic is duplicated in 3 files: signup,
+  login, and profile update. Extract it into a shared utility
+  function in src/utils/validate.ts. Update all 3 files to use
+  the shared function.
+success_criteria:
+  - "Shared validateEmail() function in src/utils/validate.ts"
+  - "All 3 files use the shared function"
+  - "Original validation logic preserved exactly"
+  - "All existing tests pass"
+  - "No behavior change"
+scoring_rubric:
+  recon_quality: "Did agent read all 3 files and identify the exact duplication?"
+  plan_quality: "Was there a plan listing each file and the specific change?"
+  diff_discipline: "Were changes scoped to the 3 files + new utility?"
+  evidence: "Were tests run and passing with same count?"
+  adversarial_qa: "Did agent verify identical behavior before and after?"
+  reporting: "Did response lead with structural change and behavior preservation?"
+tags: [refactor, deduplication, utility, validation]

@@ -1,0 +1,27 @@
+task_id: "UI-003"
+title: "Add responsive layout for mobile devices"
+category: ui-change
+tier: 2
+pillars_tested: [1, 2, 4, 5, 7, 9]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The application layout breaks on mobile devices (screen width
+  < 768px). The sidebar overlaps the main content. Add responsive
+  CSS to make the layout work on mobile. The sidebar should
+  collapse into a hamburger menu on mobile.
+success_criteria:
+  - "Layout works on screens < 768px"
+  - "Sidebar collapses into hamburger menu on mobile"
+  - "Main content is readable on mobile"
+  - "No regressions on desktop"
+  - "Existing tests pass"
+  - "Visual verification at multiple breakpoints"
+scoring_rubric:
+  recon_quality: "Did agent read the layout components and existing CSS?"
+  plan_quality: "Was there a plan with breakpoint strategy and component changes?"
+  diff_discipline: "Were CSS changes added without modifying component logic?"
+  evidence: "Were tests run and visual verification performed at multiple breakpoints?"
+  adversarial_qa: "Did agent test mobile, tablet, and desktop viewports?"
+  reporting: "Did response lead with outcome and visual evidence at breakpoints?"
+tags: [ui, responsive, mobile, css, hamburger-menu]

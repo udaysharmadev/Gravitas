@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "description": "Gravitas v4 enforcement hooks for Antigravity 2.0",
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "script": "../scripts/pre_tool.py",
+      "description": "Enforces action lock, write scope, read-before-write, and duplicate failure prevention before any tool call executes."
+    },
+    {
+      "event": "PostToolUse",
+      "script": "../scripts/post_tool.py",
+      "description": "Records tool execution to evidence ledger. Logs failures with retry fingerprint. Tracks affected files."
+    },
+    {
+      "event": "PostInvocation",
+      "script": "../scripts/post_invocation.py",
+      "description": "Persists session state to .gravitas/sessions/ after each invocation for interruption recovery."
+    },
+    {
+      "event": "Stop",
+      "script": "../scripts/stop_gate.py",
+      "description": "Completion gate. Verifies all acceptance criteria have evidence before allowing the agent to stop."
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0f0f23, #1a1a3e);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.calculator {
+    width: 320px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+    background: #1a1a2e;
+}
+
+.display {
+    padding: 25px 20px;
+    text-align: right;
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: #fff;
+    background: #16213e;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    word-break: break-all;
+}
+
+.buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    padding: 1px;
+}
+
+.btn {
+    padding: 22px;
+    font-size: 1.25rem;
+    border: none;
+    cursor: pointer;
+    background: #1a1a2e;
+    color: #fff;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.btn:hover {
+    background: #252545;
+}
+
+.btn:active {
+    transform: scale(0.95);
+}
+
+.btn.number {
+    background: #16213e;
+}
+
+.btn.number:hover {
+    background: #1f2f50;
+}
+
+.btn.operator {
+    background: #0f3460;
+    color: #e94560;
+    font-size: 1.4rem;
+}
+
+.btn.operator:hover {
+    background: #1a4a80;
+}
+
+.btn.clear {
+    background: #e94560;
+    color: #fff;
+}
+
+.btn.clear:hover {
+    background: #ff6b81;
+}
+
+.btn.delete {
+    background: #533483;
+    color: #fff;
+}
+
+.btn.delete:hover {
+    background: #6a42a0;
+}
+
+.btn.equals {
+    background: #e94560;
+    color: #fff;
+    font-size: 1.5rem;
+}
+
+.btn.equals:hover {
+    background: #ff6b81;
+}
+
+.btn.zero {
+    grid-column: span 2;
+}
