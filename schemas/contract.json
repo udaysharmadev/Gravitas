@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Gravitas Task Contract v1",
+  "type": "object",
+  "properties": {
+    "task_id": { "type": "string" },
+    "mode": { "type": "string", "enum": ["implement", "plan", "debug", "review"] },
+    "objective": { "type": "string" },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "pattern": "^AC-\\d{3}$" },
+          "statement": { "type": "string" }
+        },
+        "required": ["id", "statement"]
+      }
+    },
+    "non_goals": { "type": "array", "items": { "type": "string" } },
+    "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "budget_profile": { "type": "string", "enum": ["eco", "balanced", "deep", "team"] },
+    "allowed_write_scope": { "type": "array", "items": { "type": "string" } },
+    "forbidden_scope": { "type": "array", "items": { "type": "string" } },
+    "validators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "pattern": "^VAL-\\d{3}$" },
+          "command": { "type": "string" }
+        },
+        "required": ["id", "command"]
+      }
+    },
+    "required_validators": { "type": "array", "items": { "type": "string", "pattern": "^VAL-\\d{3}$" } },
+    "optional_validators": { "type": "array", "items": { "type": "string", "pattern": "^VAL-\\d{3}$" } },
+    "delegation_policy": { "type": "string", "enum": ["forbidden", "allowed", "required"] },
+    "completion_requirements": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": [
+    "task_id", "mode", "objective", "acceptance_criteria", 
+    "risk_level", "budget_profile", "allowed_write_scope", "validators", "required_validators"
+  ]
+}
