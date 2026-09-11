@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/udaysharmadev/Gravitas/actions/workflows/gravitas.yml/badge.svg)](https://github.com/udaysharmadev/Gravitas/actions/workflows/gravitas.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2563EB.svg?style=flat-square)](LICENSE)
-[![skills.sh installs](https://img.shields.io/endpoint?url=https://skills.sh/api/badges/installs/udaysharmadev/Gravitas&style=flat-square)](https://skills.sh/udaysharmadev/Gravitas)
+([https://skills.sh/udaysharmadev/Gravitas](https://www.skills.sh/udaysharmadev/gravitas/gravitas))
 [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-open%20standard-7C3AED.svg?style=flat-square)](https://agentskills.io/specification)
 [![Research preview](https://img.shields.io/badge/status-research%20preview-D97706.svg?style=flat-square)](#release-status)
 
