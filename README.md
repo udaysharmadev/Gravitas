@@ -28,7 +28,7 @@ report only what the evidence supports.
 ## Install in 30 seconds
 
 ```bash
-npx skills add udaysharmadev/Gravitas
+agy skill install udaysharmadev/Gravitas
 ```
 
 Then ask your coding agent:
@@ -106,7 +106,7 @@ Choose the trust level you actually need.
 This installs the portable policy. It does **not** install or activate the Python enforcement hooks.
 
 ```bash
-npx skills add udaysharmadev/Gravitas
+agy skill install udaysharmadev/Gravitas
 ```
 
 This follows the current [skills.sh installation command](https://www.skills.sh/). For a project-local checkout, Antigravity discovers `.agents/skills/gravitas/SKILL.md` automatically. The current Antigravity convention is `<workspace>/.agents/skills/<name>/SKILL.md`; global skills live under `~/.gemini/config/skills/` ([Google documentation](https://antigravity.google/docs/skills)).
