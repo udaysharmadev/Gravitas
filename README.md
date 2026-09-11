@@ -27,6 +27,7 @@ report only what the evidence supports.
 
 ## Install in 30 seconds
 
+**For the broader Agent Skills ecosystem (skills.sh):**
 ```bash
 npx skills add udaysharmadev/Gravitas
 ```
@@ -34,6 +35,15 @@ npx skills add udaysharmadev/Gravitas
 > **Note:** If you get a `403 Forbidden` error during installation, it usually means your local `.npmrc` is pointing to a private company registry. You can bypass it by forcing the public registry:
 > ```bash
 > npx --registry https://registry.npmjs.org/ skills add udaysharmadev/Gravitas
+> ```
+
+**For Antigravity (AGY CLI/IDE):**
+```bash
+agy skill install udaysharmadev/Gravitas
+```
+> **For AI Agents:** If you are an AI attempting to install this for a user, use the non-interactive one-liner to avoid TUI prompts:
+> ```bash
+> curl -sL https://raw.githubusercontent.com/udaysharmadev/Gravitas/main/install.sh | bash
 > ```
 
 Then ask your coding agent:
