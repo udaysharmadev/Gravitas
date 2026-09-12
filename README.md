@@ -1,6 +1,6 @@
 # GRAVITAS
 
-**Claude-like engineering discipline for Gemini — measured, not claimed.**
+**Claude-like engineering discipline for Gemini - measured, not claimed.**
 
 GRAVITAS is an open-source Agent Skill and optional Google Antigravity runtime for coding work. It asks an agent to inspect before editing, plan in proportion to risk, verify against real output, recover from failures, and report only what the evidence supports.
 
