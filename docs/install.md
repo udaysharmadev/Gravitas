@@ -22,8 +22,13 @@ Verify the installed files and canonical hash:
 python3 .agents/skills/gravitas/scripts/doctor.py
 ```
 
-Until the current skills.sh update path is release-tested against this published
-layout, refresh Core by re-running the Core install command. Remove it with:
+Update Core with:
+
+```bash
+npx skills update gravitas --project --yes
+```
+
+Remove it with:
 
 ```bash
 npx skills remove gravitas --project --agent antigravity --yes

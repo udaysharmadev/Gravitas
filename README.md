@@ -168,7 +168,13 @@ The Core doctor reports the installed skill path and content hash:
 python3 .agents/skills/gravitas/scripts/doctor.py
 ```
 
-Update Native by pulling the repository, rebuilding the bundle, and re-running the same `agy plugin install` command. Core update support is being release-tested; reinstall Core with the documented install command until that test is published. Full uninstall instructions are in [docs/install.md](docs/install.md).
+Update Core with:
+
+```bash
+npx skills update gravitas --project --yes
+```
+
+Update Native by pulling the repository, rebuilding the bundle, and re-running the same `agy plugin install` command. Full uninstall instructions are in [docs/install.md](docs/install.md).
 
 Native hooks are defense in depth. They cannot make shell commands safe by regex alone, and they do not replace Antigravity permissions, sandboxing, code review, or CI. See [SECURITY.md](SECURITY.md).
 

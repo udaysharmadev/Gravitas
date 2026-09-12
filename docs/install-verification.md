@@ -12,7 +12,7 @@ inspected it, and removed it in the same run.
 | B. Core install for IDE | `npx skills@1.5.26 add udaysharmadev/Gravitas --skill gravitas --agent antigravity --yes` | PASS — installed `.agents/skills/gravitas`. |
 | C. Core payload | Checked `SKILL.md`, `scripts/verify.sh`, and `references/verification.md` | PASS — all present. |
 | D. Core discovery metadata | `npx skills@1.5.26 list --agent antigravity --json` | PASS — project skill named `gravitas`, agent `Antigravity`. |
-| E. Core update | `npx skills@1.5.26 update gravitas --project --yes` | Not yet release-tested against the published commit; it is intentionally not documented as a supported public command until that test runs. |
+| E. Core update | `npx skills@1.5.26 update gravitas --project --yes` | PASS — a clean project updated one `gravitas` skill from the published GitHub commit. |
 | F. Core removal | `npx skills@1.5.26 remove gravitas --project --agent antigravity --yes` | PASS — installed skill removed. |
 | G. Native build | `bash scripts/build-native-bundle.sh` | PASS — root manifest, hooks, Core `SKILL.md`, and runtime scripts present. |
 | H. Native plugin install/discovery | `agy plugin validate /absolute/path/dist/gravitas-antigravity`; `agy plugin install …`; `agy plugin list` | PASS — validator and install reported 1 skill, 3 agents, and 1 hook set; the list showed `gravitas-native` staged. |
