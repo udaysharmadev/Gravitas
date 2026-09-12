@@ -1,7 +1,7 @@
 # GravitasBench
 
 > Status: benchmark infrastructure verified; comparative results pending
-> Gravitas v4.0 · Antigravity 2.x · September 2026
+> Research-preview benchmark design · September 2026
 
 GravitasBench is a trajectory-level benchmark for measuring the reliability impact of the Gravitas harness on Gemini models in Antigravity.
 
@@ -112,11 +112,9 @@ python3 -m venv .venv
 
 ## Results
 
-Four schema-valid smoke episodes are published in `benchmarks/results/`. They
-verify the runner, telemetry shape, derived-truth validation, and CI release
-path. They are deliberately **not** comparative model results: they do not form
-matched baseline/treatment pairs, do not use eligible implementation fixtures,
-and do not measure a Claude-reference gap.
+No release-eligible episodes are published in `benchmarks/results/`. Local
+aggregate canary artifacts may exist while developing the runner, but they are
+ignored, are not episode files, and are not model-comparison evidence.
 
 The manifest now registers 30 task specifications. The implementation adapter
 materializes a disposable, intentionally failing synthetic fixture for each
@@ -125,8 +123,8 @@ allowlisted source file, running one fixed test command, and finishing; every
 action and validator result is recorded. The fixture layer proves benchmark
 plumbing only. Licensed fixture repositories and hidden deterministic
 validators are still required before any implementation episode can be used in
-a model comparison. Smoke episodes are ignored by git and must never be
-presented as model-comparison results.
+a model comparison. Development smoke artifacts are ignored by git and must
+never be presented as model-comparison results.
 
 When comparative results are published, this section will include:
 - N tasks, runs per config

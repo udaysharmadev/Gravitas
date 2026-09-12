@@ -1,4 +1,8 @@
-# Current State Audit
+# Historical current-state audit
+
+> Superseded on 2026-09-12. This pre-release snapshot predates the verified
+> Native bundle and must not be used for current installation or readiness
+> claims. See [production-readiness.md](../production-readiness.md).
 
 ## Environment Snapshot
 * **Repository Commit SHA:** b4dbb173fcf967ae9f0829016b5c3a7846d26194

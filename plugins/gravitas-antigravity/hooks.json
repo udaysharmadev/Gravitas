@@ -1,0 +1,26 @@
+{
+  "gravitas-runtime": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "python3 scripts/pre_tool.py", "timeout": 10}
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "python3 scripts/post_tool.py", "timeout": 10}
+        ]
+      }
+    ],
+    "PostInvocation": [
+      {"type": "command", "command": "python3 scripts/post_invocation.py", "timeout": 15}
+    ],
+    "Stop": [
+      {"type": "command", "command": "python3 scripts/stop_gate.py", "timeout": 10}
+    ]
+  }
+}

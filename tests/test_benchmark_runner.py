@@ -38,6 +38,18 @@ class BenchmarkRunnerTests(unittest.TestCase):
         }
         self.assertIn("functional_solve must be False from validator outputs", validate.episode_errors(episode, schema))
 
+    def test_validator_rejects_aggregate_artifact_cleanly(self):
+        self.assertEqual(
+            validate.episode_errors([], {}, None),
+            ["episode must be a JSON object; aggregate arrays are not episode files"],
+        )
+
+    def test_validator_allows_empty_directory_only_when_requested(self):
+        with tempfile.TemporaryDirectory() as directory:
+            command = [sys.executable, str(ROOT / "benchmarks/runner/validate.py"), "--episodes", directory]
+            self.assertNotEqual(subprocess.run(command, check=False).returncode, 0)
+            self.assertEqual(subprocess.run([*command, "--allow-empty"], check=False).returncode, 0)
+
     def test_summary_excludes_invalid_infrastructure_runs(self):
         episodes = [
             {

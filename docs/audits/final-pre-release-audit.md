@@ -1,4 +1,8 @@
-# Final Pre-Release Audit
+# Historical pre-release audit
+
+> Superseded on 2026-09-12. This record refers to the former root plugin
+> layout and duplicate workspace activation copy. Use
+> [production-readiness.md](../production-readiness.md) for current status.
 
 ## Repository Structure
 - README.md: PARTIAL

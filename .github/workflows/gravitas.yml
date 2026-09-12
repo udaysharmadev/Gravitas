@@ -29,8 +29,8 @@ jobs:
       - name: Audit schemas, manifest, hooks, and claims
         run: python benchmarks/runner/audit.py
 
-      - name: Validate benchmark fixtures
-        run: python benchmarks/runner/validate.py --episodes benchmarks/results
+      - name: Validate published benchmark fixtures, if any
+        run: python benchmarks/runner/validate.py --episodes benchmarks/results --allow-empty
 
       - name: Compile native hook scripts
         run: python -m py_compile gravitas_cli.py plugins/gravitas-antigravity/scripts/*.py
@@ -41,8 +41,17 @@ jobs:
       - name: Validate portable skill structure
         run: python .github/scripts/validate_skill.py
 
-      - name: Verify Antigravity activation copy
-        run: diff -qr --exclude 'SKILL.v3.md' --exclude '__pycache__' skills/gravitas .agents/skills/gravitas
+      - name: Build and validate Native bundle
+        run: |
+          bash scripts/build-native-bundle.sh
+          test -f dist/gravitas-antigravity/plugin.json
+          test -f dist/gravitas-antigravity/hooks.json
+          test -f dist/gravitas-antigravity/skills/gravitas/SKILL.md
+          test -f dist/gravitas-antigravity/scripts/pre_tool.py
+          git diff --exit-code -- dist/gravitas-antigravity
+
+      - name: Validate public README claims
+        run: python scripts/check_readme_claims.py
 
       - name: Success
         run: 'echo "VERDICT: PASS — all checks clean"'

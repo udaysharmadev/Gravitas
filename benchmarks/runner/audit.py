@@ -34,14 +34,15 @@ def audit():
     if not intended or not unintended or not all(item.get("expect") is True for item in intended) or not all(item.get("expect") is False for item in unintended):
         errors.append("trigger evaluation must contain intended and non-activation cases with explicit expectations")
 
-    plugin = json.loads((ROOT / "plugin.json").read_text())
+    native_plugin_root = ROOT / "plugins/gravitas-antigravity"
+    plugin = json.loads((native_plugin_root / "plugin.json").read_text())
     allowed_plugin_fields = {"$schema", "name", "description"}
     if set(plugin) - allowed_plugin_fields:
         errors.append(f"Antigravity plugin manifest has unsupported fields: {sorted(set(plugin) - allowed_plugin_fields)}")
     if plugin.get("$schema") != "https://antigravity.google/schemas/v1/plugin.json":
         errors.append("plugin.json must use the official Antigravity schema")
 
-    hooks = json.loads((ROOT / "hooks.json").read_text())
+    hooks = json.loads((native_plugin_root / "hooks.json").read_text())
     runtime = hooks.get("gravitas-runtime", {})
     expected_hooks = {
         "PreToolUse": "pre_tool.py",
@@ -63,26 +64,14 @@ def audit():
         command = hook.get("command", "") if isinstance(hook, dict) else ""
         if hook_type != "command" or script not in command:
             errors.append(f"hooks.json {event} must invoke {script} as a command hook")
-        if not (ROOT / "plugins/gravitas-antigravity/scripts" / script).is_file():
+        if not (native_plugin_root / "scripts" / script).is_file():
             errors.append(f"missing hook script: {script}")
 
     canonical_root = ROOT / "skills/gravitas"
-    activation_root = ROOT / ".agents/skills/gravitas"
-    canonical_files = {
-        path.relative_to(canonical_root)
-        for path in canonical_root.rglob("*")
-        if path.is_file() and "__pycache__" not in path.parts
-    }
-    activation_files = {
-        path.relative_to(activation_root)
-        for path in activation_root.rglob("*")
-        if path.is_file() and "__pycache__" not in path.parts
-    }
-    if canonical_files != activation_files:
-        errors.append(".agents activation bundle file set must match the canonical skill bundle")
-    for relative in sorted(canonical_files & activation_files):
-        if (canonical_root / relative).read_bytes() != (activation_root / relative).read_bytes():
-            errors.append(f".agents activation copy is stale: {relative}")
+    native_plugin = native_plugin_root
+    for relative in ("plugin.json", "hooks.json", "scripts/pre_tool.py", "scripts/stop_gate.py"):
+        if not (native_plugin / relative).is_file():
+            errors.append(f"native plugin is missing {relative}")
 
     prohibited = {
         "God-tier": "unsupported superlative",
@@ -91,7 +80,7 @@ def audit():
         "94.7%": "unpublished benchmark result",
         "+52.6%": "unpublished benchmark result",
     }
-    for relative in ("README.md", "docs/FAQ.md", "plugin.json", "skills/gravitas/SKILL.md"):
+    for relative in ("README.md", "docs/FAQ.md", "plugins/gravitas-antigravity/plugin.json", "skills/gravitas/SKILL.md"):
         text = (ROOT / relative).read_text()
         for phrase, reason in prohibited.items():
             if phrase in text:
