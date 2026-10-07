@@ -1,0 +1,5 @@
+{
+  "tool_name": "write_to_file",
+  "tool_input": {"TargetFile": "src/app.py"},
+  "workspace_paths": ["/Users/dev/work/legacy-proj"]
+}

@@ -1,0 +1,10 @@
+{
+  "mode": "implement",
+  "objective": "",
+  "acceptance_criteria": [],
+  "allowed_write_scope": ["."],
+  "policy": {
+    "uncertainty": "medium",
+    "verification_depth": "impact"
+  }
+}

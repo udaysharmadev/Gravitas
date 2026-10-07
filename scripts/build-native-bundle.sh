@@ -11,13 +11,15 @@ if [[ "$bundle" != "$repo_root/dist/gravitas-antigravity" ]]; then
 fi
 
 rm -rf "$bundle"
-mkdir -p "$bundle/scripts" "$bundle/skills" "$bundle/agents"
+mkdir -p "$bundle/scripts" "$bundle/skills" "$bundle/agents" "$bundle/rules"
 
 cp "$repo_root/plugins/gravitas-antigravity/plugin.json" "$bundle/plugin.json"
 cp "$repo_root/plugins/gravitas-antigravity/hooks.json" "$bundle/hooks.json"
 cp -R "$repo_root/plugins/gravitas-antigravity/scripts/." "$bundle/scripts/"
 cp -R "$repo_root/skills/gravitas" "$bundle/skills/gravitas"
+cp -R "$repo_root/skills/gravitas-highstakes" "$bundle/skills/gravitas-highstakes"
 cp -R "$repo_root/plugins/gravitas-antigravity/agents/." "$bundle/agents/"
+cp -R "$repo_root/plugins/gravitas-antigravity/rules/." "$bundle/rules/"
 
 find "$bundle" -type d -name '__pycache__' -prune -exec rm -rf {} +
 echo "Built $bundle"

@@ -1,14 +1,16 @@
 ---
+name: gravitas-highstakes
 description: >
-  Mandatory checkpoint workflow for irreversible/high-stakes changes.
-  Use GRAVITAS Pillar 3 Tier-2 actions — schema migrations, deleting files,
-  auth/security changes, production config, force-pushes.
+  Mandatory checkpoint skill for irreversible/high-stakes changes (schema
+  migrations, file deletion, auth/security changes, production config,
+  force-pushes). Use when a task risks hard-to-reverse damage.
+license: MIT
 ---
 
-# GRAVITAS High-Stakes Workflow
+# GRAVITAS High-Stakes Skill
 
-For Tier-2 actions (hard-to-reverse, high-stakes), follow this workflow
-**in addition to** the standard GRAVITAS cognitive loop. This workflow
+For Tier-2 actions (hard-to-reverse, high-stakes), follow this skill
+**in addition to** the standard GRAVITAS cognitive loop. This skill
 enforces explicit user checkpoints.
 
 ---
@@ -93,7 +95,7 @@ Report back with:
 
 ## Abort Conditions
 
-Stop the workflow and report to the user if:
+Stop the skill and report to the user if:
 - A dry-run reveals unexpected side effects
 - The plan needs to change mid-execution
 - A verification step fails

@@ -1,0 +1,16 @@
+{
+  "hookEventName": "PreToolUse",
+  "artifactDirectoryPath": "/Users/dev/.gemini/antigravity-ide/brain/8591815f-ddcd-42e2-a41f-4d5a7a03091b",
+  "conversationId": "8591815f-ddcd-42e2-a41f-4d5a7a03091b",
+  "stepIdx": 4,
+  "toolCall": {
+    "name": "list_dir",
+    "args": {
+      "DirectoryPath": "/Users/dev/work/hooks",
+      "toolAction": "Listing workspace directory",
+      "toolSummary": "Listing directory"
+    }
+  },
+  "transcriptPath": "/Users/dev/.gemini/antigravity-ide/brain/8591815f-ddcd-42e2-a41f-4d5a7a03091b/.system_generated/logs/transcript.jsonl",
+  "workspacePaths": ["/Users/dev/work/hooks"]
+}

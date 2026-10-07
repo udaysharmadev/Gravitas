@@ -246,6 +246,94 @@ def cmd_edge_cases(args: argparse.Namespace) -> int:
     return 0
 
 
+OPENCODE_TOOL_MAP = {
+    "read": ("view_file", lambda a: {"AbsolutePath": a.get("filePath", a.get("path", ""))}),
+    "edit": ("write_to_file", lambda a: {"TargetFile": a.get("filePath", a.get("path", ""))}),
+    "write": ("write_to_file", lambda a: {"TargetFile": a.get("filePath", a.get("path", ""))}),
+    "patch": ("replace_file_content", lambda a: {"target_file": a.get("filePath", a.get("path", ""))}),
+    "bash": ("run_command", lambda a: {"CommandLine": a.get("command", "")}),
+    "grep": ("grep_search", lambda a: dict(a)),
+    "glob": ("find_by_name", lambda a: dict(a)),
+    "list": ("list_dir", lambda a: dict(a)),
+}
+
+
+def _opencode_tool(tool: str, args: dict) -> tuple[str, dict]:
+    mapped = OPENCODE_TOOL_MAP.get(tool)
+    if mapped is None:
+        return tool, args if isinstance(args, dict) else {}
+    name, convert = mapped
+    return name, convert(args if isinstance(args, dict) else {})
+
+
+def cmd_guard(args: argparse.Namespace) -> int:
+    """One policy decision for a host envelope on stdin/--envelope."""
+    try:
+        from gravitas_action import HostEnvelope, normalize, workspace_roots
+        from gravitas_policy import action_fingerprint, evaluate_action
+    except ModuleNotFoundError:
+        print(json.dumps({"decision": "allow",
+                          "warning": f"runtime assets not found under {ROOT}"}))
+        return 0
+    raw = args.envelope or sys.stdin.read()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        print(json.dumps({"decision": "deny", "reason": "guard could not parse the envelope; denied fail-closed"}))
+        return 0
+    if not isinstance(data, dict) or not isinstance(data.get("tool"), str):
+        print(json.dumps({"decision": "deny", "reason": "guard envelope has no tool"}))
+        return 0
+    envelope = HostEnvelope(tool=data["tool"], args=data.get("args", {}),
+                            conversation_id=data.get("conversation_id", ""),
+                            workspace_roots=data.get("workspace_roots", []),
+                            host=data.get("host", ""), event=data.get("event", "before_action"))
+    if envelope.host == "opencode":
+        # OpenCode tool vocabulary onto the normalized model. Unknown tools
+        # stay unmapped: visible (kind "other"), never gated.
+        envelope.tool, envelope.args = _opencode_tool(envelope.tool, envelope.args)
+    contract_path = Path(args.contract) if args.contract else Path.cwd() / ".gravitas" / "opencode-contract.json"
+    try:
+        contract = json.loads(contract_path.read_text()) if contract_path.exists() else {}
+    except json.JSONDecodeError:
+        contract = {}
+    if not isinstance(contract, dict):
+        contract = {}
+    from gravitas_policy import normalize_mode
+    action = normalize(envelope.tool, envelope.args)
+    decision, reason = evaluate_action(
+        action, mode=normalize_mode(contract.get("mode", "implement")),
+        allowed_scope=contract.get("allowed_write_scope", []), reads=set(),
+        failed_fingerprints=set(), roots=workspace_roots(envelope),
+        fingerprint=action_fingerprint(envelope.tool, envelope.args))
+    out = {"decision": "deny" if decision == "force_ask" else decision}
+    if reason:
+        out["reason"] = reason
+    print(json.dumps(out))
+    return 0
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """Scaffold host configuration in a project directory."""
+    root = Path(args.root).resolve()
+    # Templates ship with the checkout and inside the wheel (share/gravitas).
+    for candidate in (Path.cwd(), MODULE_ROOT, ROOT):
+        if (candidate / "adapters" / "opencode" / "contract-template.json").exists():
+            source_root = candidate
+            break
+    else:
+        print(json.dumps({"ok": False, "error": "adapter templates not found; reinstall gravitas"}))
+        return 1
+    if args.host == "opencode":
+        from gravitas_init import init_opencode
+        result = init_opencode(root, profile=args.profile, source_root=source_root)
+    else:
+        from gravitas_init import init_antigravity
+        result = init_antigravity(root, source_root=source_root)
+    print(json.dumps(result, indent=2))
+    return 0 if result.get("ok") else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="gravitas")
     sub = parser.add_subparsers(dest="subcommand", required=True)
@@ -284,6 +372,15 @@ def main() -> int:
     edge = sub.add_parser("edge-cases", help="Expand seed values into deterministic boundary variants")
     edge.add_argument("--seeds", default="[]", help="JSON array of seed values")
     edge.set_defaults(func=cmd_edge_cases)
+    guard = sub.add_parser("guard", help="Policy decision for a host envelope (used by the OpenCode plugin shim)")
+    guard.add_argument("--envelope", default="", help="HostEnvelope JSON; reads stdin when empty")
+    guard.add_argument("--contract", default="", help="Workspace contract JSON path (default: .gravitas/opencode-contract.json)")
+    guard.set_defaults(func=cmd_guard)
+    init = sub.add_parser("init", help="Scaffold host configuration (opencode, antigravity) in a project")
+    init.add_argument("--host", required=True, choices=["opencode", "antigravity"])
+    init.add_argument("--profile", default="balanced", choices=["fast", "balanced", "strict"])
+    init.add_argument("--root", default=".")
+    init.set_defaults(func=cmd_init)
     bench = sub.add_parser("bench", help="GravitasBench reproducibility CLI (doctor, build-corpus, pilot, run, report)")
     bench.add_argument("bench_args", nargs=argparse.REMAINDER)
     bench.set_defaults(func=cmd_bench)

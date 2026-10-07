@@ -18,16 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from session_context import session_dir_for_payload
 from evidence_chain import append_evidence
-from gravitas_action import antigravity_envelope, target_file
-
-
-READ_TOOLS = {
-    "view_file", "grep_search", "find_by_name", "list_dir"
-}
-
-WRITE_TOOLS = {
-    "write_to_file", "replace_file_content", "multi_replace_file_content"
-}
+from gravitas_action import READ_TOOLS, WRITE_TOOLS, antigravity_envelope, target_file
 
 
 def tool_call(payload: object) -> tuple[str, dict]:

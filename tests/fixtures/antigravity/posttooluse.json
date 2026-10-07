@@ -1,0 +1,13 @@
+{
+  "hookEventName": "PostToolUse",
+  "conversationId": "8591815f-ddcd-42e2-a41f-4d5a7a03091b",
+  "stepIdx": 4,
+  "toolCall": {
+    "name": "run_command",
+    "args": {"CommandLine": "pytest -q"}
+  },
+  "tool_output": "3 passed",
+  "success": true,
+  "error": "",
+  "workspacePaths": ["/Users/dev/work/hooks"]
+}

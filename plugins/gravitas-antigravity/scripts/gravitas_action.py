@@ -72,12 +72,27 @@ WRITE_TOOLS = frozenset({
     "write_to_file", "replace_file_content", "multi_replace_file_content",
 })
 
+#: Aliases observed on real hosts (fixture-pinned in tests/fixtures/).
+#: Unknown tool names normalize to kind "other": visible, never gated.
+TOOL_ALIASES = {
+    "edit_file": "write_to_file",
+    "write_file": "write_to_file",
+    "create_file": "write_to_file",
+}
+
 SHELL_TOOLS = frozenset({"run_command"})
 
 
+def canonical_tool(tool: str) -> str:
+    return TOOL_ALIASES.get(tool, tool)
+
+
 def target_file(tool: str, args: dict) -> str:
+    tool = canonical_tool(tool)
     if tool == "view_file":
         return str(args.get("AbsolutePath", args.get("absolute_path", "")))
+    if tool == "list_dir":
+        return str(args.get("DirectoryPath", args.get("directory_path", "")))
     return str(args.get("TargetFile", args.get("target_file", "")))
 
 
@@ -287,6 +302,7 @@ def classify_shell(command: str) -> dict:
 def normalize(tool: str, args: dict, *, host_metadata: dict | None = None) -> Action:
     """Build a normalized Action from a host tool call."""
     meta = dict(host_metadata or {})
+    tool = canonical_tool(tool)
     if tool in READ_TOOLS:
         return Action(kind="read", tool=tool, paths=[p for p in [target_file(tool, args)] if p],
                       mutation="none", host_metadata=meta)
@@ -323,10 +339,11 @@ def antigravity_envelope(payload: object) -> tuple[HostEnvelope, Action] | tuple
     raw_roots = payload.get("workspacePaths") or payload.get("workspace_paths") or []
     roots = [str(value) for value in raw_roots if isinstance(value, str) and value]
     conversation = payload.get("conversationId") or payload.get("conversation_id") or ""
-    envelope = HostEnvelope(tool=name, args=args,
+    envelope = HostEnvelope(tool=canonical_tool(name), args=args,
                             conversation_id=conversation if isinstance(conversation, str) else "",
                             workspace_roots=roots, host="antigravity",
-                            event=str(payload.get("hookEvent", "before_action")))
+                            event=str(payload.get("hookEventName",
+                                                  payload.get("hookEvent", "before_action"))))
     action = normalize(name, args, host_metadata={"conversation_id": envelope.conversation_id})
     return envelope, action
 

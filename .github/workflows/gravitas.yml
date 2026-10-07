@@ -47,7 +47,11 @@ jobs:
           test -f dist/gravitas-antigravity/plugin.json
           test -f dist/gravitas-antigravity/hooks.json
           test -f dist/gravitas-antigravity/skills/gravitas/SKILL.md
+          test -f dist/gravitas-antigravity/skills/gravitas-highstakes/SKILL.md
+          test -f dist/gravitas-antigravity/rules/gravitas-invariants.md
           test -f dist/gravitas-antigravity/scripts/pre_tool.py
+          test -f dist/gravitas-antigravity/scripts/gravitas_action.py
+          test -f dist/gravitas-antigravity/scripts/gravitas_policy.py
           git diff --exit-code -- dist/gravitas-antigravity
 
       - name: Validate public README claims

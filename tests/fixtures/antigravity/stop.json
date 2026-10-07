@@ -1,0 +1,9 @@
+{
+  "hookEventName": "Stop",
+  "conversationId": "8591815f-ddcd-42e2-a41f-4d5a7a03091b",
+  "error": "",
+  "executionNum": 0,
+  "fullyIdle": true,
+  "terminationReason": "NO_TOOL_CALL",
+  "workspacePaths": ["/Users/dev/work/hooks"]
+}

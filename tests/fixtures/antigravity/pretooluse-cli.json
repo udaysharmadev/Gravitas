@@ -1,0 +1,10 @@
+{
+  "hookEventName": "PreToolUse",
+  "conversationId": "cli-conversation-1",
+  "stepIdx": 0,
+  "toolCall": {
+    "name": "run_command",
+    "args": {"CommandLine": "rm -rf build/"}
+  },
+  "workspacePaths": ["/Users/dev/work/cli-proj"]
+}
