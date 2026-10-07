@@ -1,5 +1,8 @@
 # Comprehensive Edge Cases
 
+> Research archive. Tier vocabulary maps to policy records
+> (`direct/compact/deep`) per `skills/gravitas/SKILL.md`.
+
 100+ edge cases organized by pillar, each with scenario, handling, and recovery. These represent situations where the standard pillar procedure encounters ambiguity, conflict, or failure.
 
 ---

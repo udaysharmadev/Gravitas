@@ -1,5 +1,8 @@
 # Edge Case Resolution
 
+> Research archive. Tier vocabulary maps to policy records
+> (`direct/compact/deep`) per `skills/gravitas/SKILL.md`.
+
 Resolution status for all 100+ edge cases documented in `docs/edge-cases.md`. For each edge case: is the current protocol sufficient? If not, what addition is needed?
 
 ---

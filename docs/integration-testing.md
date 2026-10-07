@@ -1,5 +1,8 @@
 # Integration Testing
 
+> Research archive (pre-policy-engine test plan). Normative verification:
+> `tests/` suite, `docs/adr/0006-verification.md`, `docs/benchmark.md`.
+
 End-to-end testing of GRAVITAS within Antigravity. Covers skill activation, pillar behavior, tool integration, and multi-agent coordination.
 
 ---

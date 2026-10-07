@@ -1,5 +1,8 @@
 # Failure Mode Catalog
 
+> Research catalog; failure taxonomy is normative in `docs/FAILURE-TAXONOMY.md`.
+> Pillar/tier references are historical — see `docs/adr/` for the runtime model.
+
 A comprehensive catalog of known agent failure modes, mapped to GRAVITAS pillars. Sourced from MAST taxonomy, Microsoft taxonomy, IJETRM taxonomy, and PING taxonomy, with coding-specific additions.
 
 ---

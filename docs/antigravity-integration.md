@@ -1,5 +1,9 @@
 # Antigravity Integration Map
 
+> Research archive (pre-Phase-2 design doc). It describes pillars/tiers that
+> no longer exist. Current sources: `docs/hosts.md`, `docs/concepts.md`,
+> `docs/adr/0004-kernel-policy.md`, `docs/adr/0008-host-adapters.md`.
+
 A detailed mapping of how GRAVITAS pillars interact with Antigravity's features and toolset. For each feature: which pillars use it, integration points, permissions needed, and caveats.
 
 ---

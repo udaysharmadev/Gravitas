@@ -85,7 +85,7 @@ Use Gravitas to review this authentication change for correctness and regression
 ```
 
 ```text
-Use Gravitas in plan-only mode. Investigate migrating this project to PostgreSQL and give me an implementation plan. Do not change anything.
+Use Gravitas in plan mode. Investigate migrating this project to PostgreSQL and give me an implementation plan. Do not change anything.
 ```
 
 ## What GRAVITAS changes
@@ -100,19 +100,18 @@ With:    task → contract → reconnaissance → scoped change
 
 It does not assume a model is careless. It makes the engineering loop explicit: strong model + a better harness can produce a more auditable process.
 
-## Core vs Native
+## Core vs Native vs OpenCode
 
-| Capability | Core | Native |
-|---|:---:|:---:|
-| Agent Skills compatible | ✓ | ✓ |
-| Planning, read-before-write, verification policy | Instruction | Instruction + hook checks |
-| Adaptive effort and plan-only guidance | Instruction | Instruction + action lock |
-| Evidence ledger | — | Enforced runtime record |
-| Pre-tool checks | — | Enforced where host hooks apply |
-| Completion gate | — | Enforced where host hooks apply |
-| Antigravity required | — | Yes |
+| Capability | Core | Native (Antigravity) | OpenCode |
+|---|:---:|:---:|:---:|
+| Agent Skills compatible | ✓ | ✓ | ✓ |
+| Planning, read-before-write, verification policy | Instruction | Instruction + hook checks | Instruction + permissions |
+| Adaptive effort and plan-mode guidance | Instruction | Instruction + action lock | Instruction + permission profiles |
+| Evidence ledger | — | Enforced runtime record | Manual via CLI |
+| Pre-tool checks | — | Enforced where host hooks apply | Shim + permissions |
+| Completion gate | — | Enforced where host hooks apply | Manual (`summarize` + evidence) |
 
-Core is the practical default. Native is optional, and its hooks are workflow controls—not an operating-system sandbox.
+Core is the practical default. Native is optional, and its hooks are workflow controls—not an operating-system sandbox. OpenCode setup is one command: `gravitas init --host opencode` (see [quickstart](docs/quickstart.md) and [hosts](docs/hosts.md)).
 
 ## Evidence
 
@@ -176,17 +175,20 @@ npx skills update gravitas --project --yes
 
 Update Native by pulling the repository, rebuilding the bundle, and re-running the same `agy plugin install` command. Full uninstall instructions are in [docs/install.md](docs/install.md).
 
-Native hooks are defense in depth. They cannot make shell commands safe by regex alone, and they do not replace Antigravity permissions, sandboxing, code review, or CI. See [SECURITY.md](SECURITY.md).
+Native hooks are defense in depth. Shell classification is tokenizer-based with capability levels, not a regex denylist — but hooks still do not replace host permissions, sandboxing, code review, or CI. See [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
+- [Quickstart](docs/quickstart.md) (Core, Native, OpenCode)
+- [Concepts](docs/concepts.md) (contract, context, evidence, policy, recovery)
+- [Hosts](docs/hosts.md) (capability differences, honestly)
+- [Configuration](docs/configuration.md) (profiles, overrides, contracts)
+- [Benchmark methodology](docs/benchmark.md)
 - [Install and troubleshooting](docs/install.md)
-- [Installation verification](docs/install-verification.md)
+- [Contributing](docs/contributing.md) (architecture + test expectations)
+- [Security policy](SECURITY.md) (what is and is not enforced)
 - [Research foundations](docs/research.md)
-- [Architecture](docs/architecture.md)
-- [Benchmark protocol](benchmarks/README.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
+- [Architecture decisions](docs/adr/)
 
 ## Contributing
 
