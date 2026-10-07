@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Gravitas verification runner.
 
-Runs the appropriate verification chain for the detected project type
-and emits a machine-parseable VERDICT: PASS or VERDICT: FAIL.
-
-Usage: python verify.py [--lang LANG] [--cmd CMD]
+Discovers project-declared validators (see gravitas_verify) instead of
+assuming toolchains from language. Historical language->command chains are
+kept only as a labeled last-resort fallback when discovery finds nothing.
 """
 import json
 import subprocess
@@ -12,16 +11,21 @@ import sys
 import argparse
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "plugins" / "gravitas-antigravity" / "scripts"))
 
-VERIFICATION_CHAINS = {
-    "typescript": "tsc --noEmit && eslint . && vitest run",
-    "python": "mypy . && ruff check . && pytest",
-    "rust": "cargo check && cargo clippy && cargo test",
-    "go": "go vet ./... && go test ./...",
-    "java": "./mvnw verify",
-    "csharp": "dotnet build && dotnet test",
-    "ruby": "bundle exec rubocop && bundle exec rspec",
-    "php": "composer phpstan && composer test",
+try:
+    from gravitas_verify import discover_validators
+    _DISCOVERY = True
+except ModuleNotFoundError:
+    _DISCOVERY = False
+
+# Last-resort fallback only: used solely when discovery finds no
+# project-declared validators. Never preferred over discovered commands.
+FALLBACK_CHAINS = {
+    "typescript": "npx tsc --noEmit",
+    "python": "python3 -m pytest -q",
+    "rust": "cargo test",
+    "go": "go test ./...",
 }
 
 
@@ -75,15 +79,24 @@ def main():
 
     if args.cmd:
         command = args.cmd
-    elif language in VERIFICATION_CHAINS:
-        command = VERIFICATION_CHAINS[language]
+        provenance = "explicit --cmd"
     else:
-        print(f"VERDICT: FAIL -- language '{language}' not recognized")
-        print("Specify --lang or --cmd to run verification manually.")
-        sys.exit(1)
+        catalog = discover_validators(Path.cwd()) if _DISCOVERY else {"validators": []}
+        tests = [v for v in catalog["validators"] if v["kind"] == "test"]
+        if tests:
+            command = " && ".join(" ".join(c) for c in [v["command"] for v in tests])
+            provenance = "discovered: " + ", ".join(v["id"] for v in tests)
+        elif language in FALLBACK_CHAINS:
+            command = FALLBACK_CHAINS[language]
+            provenance = f"fallback chain for {language} (no project-declared validators found)"
+        else:
+            print(f"VERDICT: FAIL -- no validators discovered for '{language}'")
+            print("Specify --cmd to run verification manually.")
+            sys.exit(1)
 
     print(f"Language: {language}")
     print(f"Command:  {command}")
+    print(f"Source:   {provenance}")
     print("Running...")
     print("-" * 60)
 

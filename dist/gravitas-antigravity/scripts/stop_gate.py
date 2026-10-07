@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 from session_context import session_dir_for_payload
+from gravitas_evidence import criterion_states, evidence_deficit, is_fresh, owned_validator_pass
 
 
 def load_contract(session_dir: Path) -> dict:
@@ -92,17 +93,6 @@ def criterion_label(criterion: object, index: int) -> str:
     return criterion.get("statement", criterion.get("id", "")) if isinstance(criterion, dict) else str(criterion)
 
 
-def owned_validator_pass(entry: dict) -> bool:
-    """Only Gravitas-owned executions are completion-grade evidence."""
-    return (
-        entry.get("source") == "validator"
-        and entry.get("verdict") == "PASS"
-        and entry.get("exit_code") == 0
-        and isinstance(entry.get("validator_id"), str)
-        and isinstance(entry.get("event_hash"), str)
-    )
-
-
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -139,18 +129,18 @@ def main():
         }))
         return
 
-    # Check acceptance criteria coverage
+    # Acceptance criteria gate on fresh owned evidence only. Stale PASS
+    # (written before the final mutation), SUPPORTED, FAIL, BLOCKED, and
+    # UNVERIFIABLE all block with the deficit action attached.
+    states = criterion_states(contract, evidence)
     acceptance_criteria = contract.get("acceptance_criteria", [])
+    deficit = {item["criterion"]: item for item in evidence_deficit(contract, states)}
     uncovered = []
-
     for index, criterion in enumerate(acceptance_criteria, 1):
         identifier = criterion_id(criterion, index)
-        has_evidence = any(
-            identifier in entry.get("criterion_ids", []) and owned_validator_pass(entry)
-            for entry in evidence
-        )
-        if not has_evidence:
-            uncovered.append(criterion_label(criterion, index))
+        if states.get(identifier, {}).get("status") != "PASS":
+            need = deficit.get(identifier, {}).get("needed", "record evidence")
+            uncovered.append(f"{criterion_label(criterion, index)} [{need}]")
 
     if uncovered:
         reason = (
@@ -170,13 +160,13 @@ def main():
     missing_validators = [
         validator for validator in required_validators
         if not any(
-            validator in " ".join(entry.get("command", [])) and owned_validator_pass(entry)
+            validator in " ".join(entry.get("command", [])) and owned_validator_pass(entry) and is_fresh(entry, evidence)
             for entry in evidence
         )
     ]
     missing_validators.extend(
         validator_id for validator_id in required_validator_ids
-        if not any(entry.get("validator_id") == validator_id and owned_validator_pass(entry) for entry in evidence)
+        if not any(entry.get("validator_id") == validator_id and owned_validator_pass(entry) and is_fresh(entry, evidence) for entry in evidence)
     )
     if missing_validators:
         reason = "Completion gate: required validators missing or failing: " + ", ".join(missing_validators)

@@ -13,6 +13,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from impact_graph import build_impact_graph
 from session_context import session_dir_for_payload
+from gravitas_evidence import criterion_states, is_fresh, owned_validator_pass
 
 
 def criterion_id(criterion: object, index: int) -> str:
@@ -41,25 +42,30 @@ def update_state_from_evidence(state: dict, session_dir: Path) -> dict:
     if not evidence_path.exists():
         return state
 
-    files_touched = set(state.get("files_touched", []))
-    completed_criteria = set(state.get("completed_criteria", []))
-    read_files = set(state.get("read_files", []))
-
+    entries = []
     with open(evidence_path) as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             try:
-                entry = json.loads(line)
-                if entry.get("source") == "write" and entry.get("file"):
-                    files_touched.add(entry["file"])
-                if entry.get("source") == "read" and entry.get("file"):
-                    read_files.add(entry["file"])
-                if entry.get("source") == "validator" and entry.get("verdict") == "PASS" and entry.get("exit_code") == 0:
-                    completed_criteria.update(entry.get("criterion_ids", []))
+                entries.append(json.loads(line))
             except json.JSONDecodeError:
                 pass
+
+    files_touched = set(state.get("files_touched", []))
+    completed_criteria = set(state.get("completed_criteria", []))
+    read_files = set(state.get("read_files", []))
+
+    for entry in entries:
+        if entry.get("source") == "write" and entry.get("file"):
+            files_touched.add(entry["file"])
+        if entry.get("source") == "read" and entry.get("file"):
+            read_files.add(entry["file"])
+        # Only fresh owned PASS counts: evidence predating the final
+        # mutation is stale and must be re-run.
+        if owned_validator_pass(entry) and is_fresh(entry, entries):
+            completed_criteria.update(entry.get("criterion_ids", []))
 
     state["files_touched"] = sorted(files_touched)
     state["completed_criteria"] = sorted(completed_criteria)
@@ -88,7 +94,8 @@ def update_state_from_evidence(state: dict, session_dir: Path) -> dict:
                 failures.append(entry)
         state["known_failures"] = failures
 
-    coverage = {identifier: ("PASS" if identifier in completed_criteria else "PENDING") for identifier in criterion_ids}
+    coverage = {identifier: info["status"]
+                for identifier, info in criterion_states(contract, entries).items()}
     (session_dir / "coverage.json").write_text(json.dumps(coverage, indent=2) + "\n")
     return state
 

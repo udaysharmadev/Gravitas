@@ -188,6 +188,64 @@ def cmd_context(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_validators(args: argparse.Namespace) -> int:
+    try:
+        from gravitas_verify import discover_validators, escalation_plan
+        from gravitas_repo import context_for, get_index
+    except ModuleNotFoundError:
+        print(json.dumps({"error": f"runtime assets not found under {ROOT}; reinstall gravitas or run from a checkout"}))
+        return 1
+    root = Path(args.root)
+    catalog = discover_validators(root)
+    related: dict = {}
+    if args.changed:
+        try:
+            index = get_index(root)
+            for target in args.changed:
+                context = context_for(index, [target], "dependency")
+                related[target] = [p for p in context["files"] if p != target]
+        except OSError:
+            pass
+    print(json.dumps({
+        "catalog": catalog,
+        "plan": escalation_plan(
+            catalog, verification_depth=args.depth, changed=args.changed,
+            related=related, failure_evidence=args.failure_evidence,
+            release_context=args.release),
+    }, indent=2))
+    return 0
+
+
+def cmd_repro(args: argparse.Namespace) -> int:
+    command = [sys.executable, str(SCRIPTS / "repro_runner.py"),
+               "--session-dir", args.session_dir, "--criterion-id", args.criterion_id,
+               "--phase", args.phase, "--cwd", args.cwd]
+    if args.unreproducible:
+        command.extend(["--unreproducible", "--reason", args.reason])
+        return subprocess.run(command, check=False).returncode
+    user_command = args.command[1:] if args.command[:1] == ["--"] else args.command
+    command.extend(["--", *user_command])
+    return subprocess.run(command, check=False).returncode
+
+
+def cmd_edge_cases(args: argparse.Namespace) -> int:
+    try:
+        from gravitas_verify import expand_cases
+    except ModuleNotFoundError:
+        print(json.dumps({"error": f"runtime assets not found under {ROOT}; reinstall gravitas or run from a checkout"}))
+        return 1
+    try:
+        seeds = json.loads(args.seeds)
+    except json.JSONDecodeError as error:
+        print(json.dumps({"error": f"seeds is not valid JSON: {error}"}))
+        return 1
+    if not isinstance(seeds, list):
+        print(json.dumps({"error": "seeds must be a JSON array"}))
+        return 1
+    print(json.dumps(expand_cases(seeds), indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="gravitas")
     sub = parser.add_subparsers(dest="subcommand", required=True)
@@ -207,6 +265,25 @@ def main() -> int:
     context.add_argument("--changed", nargs="+", required=True)
     context.add_argument("--depth", default="dependency", choices=["target", "dependency", "subsystem"])
     context.set_defaults(func=cmd_context)
+    validators = sub.add_parser("validators", help="Discover repo-aware validators and print an escalation plan")
+    validators.add_argument("--root", default=".")
+    validators.add_argument("--depth", default="targeted", choices=["targeted", "impact", "full"])
+    validators.add_argument("--changed", nargs="*", default=[])
+    validators.add_argument("--failure-evidence", action="store_true")
+    validators.add_argument("--release", action="store_true")
+    validators.set_defaults(func=cmd_validators)
+    repro = sub.add_parser("repro", help="Run a bug reproducer bound to a criterion (reproduction-first protocol)")
+    repro.add_argument("--session-dir", required=True)
+    repro.add_argument("--criterion-id", required=True)
+    repro.add_argument("--phase", default="before", choices=["before", "after"])
+    repro.add_argument("--unreproducible", action="store_true")
+    repro.add_argument("--reason", default="")
+    repro.add_argument("--cwd", default=".")
+    repro.add_argument("command", nargs=argparse.REMAINDER)
+    repro.set_defaults(func=cmd_repro)
+    edge = sub.add_parser("edge-cases", help="Expand seed values into deterministic boundary variants")
+    edge.add_argument("--seeds", default="[]", help="JSON array of seed values")
+    edge.set_defaults(func=cmd_edge_cases)
     bench = sub.add_parser("bench", help="GravitasBench reproducibility CLI (doctor, build-corpus, pilot, run, report)")
     bench.add_argument("bench_args", nargs=argparse.REMAINDER)
     bench.set_defaults(func=cmd_bench)

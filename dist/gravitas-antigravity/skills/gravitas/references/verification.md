@@ -49,12 +49,77 @@ After changes:
 
 ## Scope-Appropriate Verification
 
+Never run every validator blindly. Discover first, then escalate:
+
+```bash
+gravitas validators --root . --changed src/auth/session.ts --depth impact
+```
+
+| Depth | Runs | Expands when |
+|-------|------|--------------|
+| targeted | test validators scoped to changed files | always (baseline) |
+| impact | + callers/tests/configs from the repo graph | depth=impact, failure evidence, broad fanout |
+| suite | + all project validators | depth=full, failure evidence, release context |
+| full | + CI workflows | release context only |
+
+Validators come from `gravitas_verify.discover_validators`: project
+config + resolvable binary = catalog entry with provenance. Nothing is
+assumed from language. Empty catalog means "say so", not "invent commands".
+
 | Scope | Verification |
 |-------|-------------|
 | Single function change | Targeted: run tests for that module |
-| Multi-file feature | Affected: run all tests for changed modules |
-| Shared utility change | Broad: run full test suite |
-| Auth/security/schema | Full: complete test suite + static analysis |
+| Multi-file feature | Impact: run all tests for changed modules + callers |
+| Shared utility change | Suite: run full test suite |
+| Auth/security/schema | Full: complete suite + static analysis |
+
+## Requirement-Evidence States
+
+Each criterion is PENDING, SUPPORTED, PASS, FAIL, BLOCKED, or
+UNVERIFIABLE (`gravitas summarize` shows the matrix). Only fresh
+Gravitas-owned validator PASS gates completion -- evidence predating the
+final mutation is stale and must be re-run. Non-owned evidence
+(SUPPORTED) never opens the gate.
+
+## Reproduction-First Debugging
+
+```
+symptom -> reproduce -> record failing evidence -> localize -> patch
+       -> rerun the SAME reproduction -> regression verification
+```
+
+```bash
+# 1. Confirm the bug with a reproducer (must FAIL before the fix)
+gravitas repro --session-dir <dir> --criterion-id AC-1 --phase before -- ./repro.sh
+# 2. Patch, then rerun the same reproducer (must PASS after)
+gravitas repro --session-dir <dir> --criterion-id AC-1 --phase after -- ./repro.sh
+```
+
+A bug is not confirmed because code "looks suspicious". When reproduction
+is impossible, record why instead of fabricating one:
+
+```bash
+gravitas repro --session-dir <dir> --criterion-id AC-1 --unreproducible \
+  --reason "requires production payment hardware"
+```
+
+This stores UNVERIFIABLE, which blocks the finish gate until the contract
+is explicitly amended. Confidence is reduced, honestly.
+
+## Adversarial Edge Cases (strict/security work)
+
+For security, auth, algorithms, and stateful behavior, expand seeds into
+deterministic boundary variants and execute them through a trusted project
+validator; surprises become regression tests:
+
+```bash
+gravitas edge-cases --seeds '["5", "", []]'
+gravitas validator --session-dir <dir> --validator-id unit --criterion-id AC-1 -- ./run_case.sh
+```
+
+Trigger selectively: strict/deep mode, repeated repairs, high
+uncertainty. Development tests and hidden benchmark validators stay
+separate; self-review never counts as correctness evidence.
 
 ## When Self-Review Is Acceptable
 

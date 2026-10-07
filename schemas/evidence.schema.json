@@ -11,7 +11,7 @@
       "type": "string",
       "enum": [
         "test_run", "lint", "type_check", "build", "diff", "static_analysis",
-        "validator", "self_review", "read", "write"
+        "validator", "self_review", "read", "write", "reproducer"
       ]
     },
     "tool_call_id": {"type": "string"},
@@ -19,6 +19,8 @@
     "command": {"type": ["string", "array"], "items": {"type": "string"}},
     "validator_id": {"type": "string"},
     "criterion_ids": {"type": "array", "items": {"type": "string"}},
+    "phase": {"type": "string", "description": "Reproduction phase: before (failing evidence) or after (fix verification)."},
+    "reason": {"type": "string", "description": "Why reproduction is impossible (UNVERIFIABLE records)."},
     "exit_code": {"type": "integer"},
     "command_sha256": {"type": "string"},
     "stdout_sha256": {"type": "string"},
@@ -34,7 +36,7 @@
       "description": "Bounded diagnostic output; must be scrubbed of credentials and personal data."
     },
     "timestamp": {"type": "string", "format": "date-time"},
-    "verdict": {"type": "string", "enum": ["PASS", "FAIL", "CONDITIONAL_PASS", "PENDING"]}
+    "verdict": {"type": "string", "enum": ["PASS", "FAIL", "CONDITIONAL_PASS", "PENDING", "UNVERIFIABLE"]}
   },
   "allOf": [
     {
@@ -47,7 +49,7 @@
           "source": {
             "enum": [
               "test_run", "lint", "type_check", "build", "diff",
-              "static_analysis", "validator", "self_review"
+              "static_analysis", "validator", "self_review", "reproducer"
             ]
           }
         },

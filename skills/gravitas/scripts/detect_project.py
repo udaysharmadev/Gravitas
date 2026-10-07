@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """Gravitas project detector.
 
-Detects the project type, language, and complexity tier to inform
-budget profile selection. Outputs a JSON summary to stdout.
+Detects the project language and discovers project-declared validators
+(see gravitas_verify). Never assumes toolchains from language alone.
 """
 import json
 import os
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "plugins" / "gravitas-antigravity" / "scripts"))
+
+try:
+    from gravitas_verify import discover_validators
+    _DISCOVERY = True
+except ModuleNotFoundError:
+    _DISCOVERY = False
 
 
 LANGUAGE_MARKERS = {
@@ -27,17 +35,6 @@ TEST_MARKERS = {
     "rust": ["tests/"],
     "go": ["*_test.go"],
     "java": ["src/test/"],
-}
-
-VERIFICATION_COMMANDS = {
-    "typescript": "tsc --noEmit && eslint . && vitest run",
-    "python": "mypy . && ruff check . && pytest",
-    "rust": "cargo check && cargo clippy && cargo test",
-    "go": "go vet ./... && go test ./...",
-    "java": "./mvnw verify",
-    "csharp": "dotnet build && dotnet test",
-    "ruby": "bundle exec rubocop && bundle exec rspec",
-    "php": "composer phpstan && composer test",
 }
 
 
@@ -92,14 +89,15 @@ def main():
     language = detect_language(root)
     source_count = count_source_files(root, language)
     has_tests = (root / "tests").exists() or (root / "test").exists() or (root / "spec").exists()
-    verification_cmd = VERIFICATION_COMMANDS.get(language, "[language not detected — add manually]")
+    catalog = discover_validators(root) if _DISCOVERY else {"validators": [], "ci": []}
     suggested_budget = suggest_budget(source_count, has_tests)
 
     result = {
         "language": language,
         "source_files": source_count,
         "has_tests": has_tests,
-        "verification_command": verification_cmd,
+        "validators": catalog["validators"],
+        "ci": catalog.get("ci", []),
         "suggested_budget": suggested_budget,
         "root": str(root),
     }
