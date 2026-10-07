@@ -99,16 +99,25 @@ class BenchmarkRunnerTests(unittest.TestCase):
         self.assertEqual(len(set(task_ids)), 30)
         self.assertFalse(set(task_ids) - specs)
 
-    def test_fixture_is_disposable_and_starts_with_a_failing_validator(self):
+    def test_fixture_withholds_acceptance_and_starts_failing(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "fixture"
             metadata = fixtures.materialize("BF-001", root)
-            result = subprocess.run(
+            # Solver sees only the broken implementation and an import smoke test.
+            self.assertFalse((root / "tests" / "test_hidden_acceptance.py").exists())
+            self.assertFalse(any("assertEqual" in path.read_text()
+                                 for path in (root / "tests").glob("*.py")))
+            smoke = subprocess.run(
                 ["python3", "-m", "unittest", "discover", "-s", "tests", "-v"],
                 cwd=root, capture_output=True, text=True, check=False,
             )
-            self.assertFalse(result.returncode == 0)
+            self.assertEqual(smoke.returncode, 0)
+            # The withheld acceptance test fails against the broken fixture.
+            hidden = implementation.run_hidden_validation(root, "BF-001")
+            self.assertFalse(hidden["passed"])
+            self.assertFalse((root / "tests" / "test_hidden_acceptance.py").exists())
             self.assertEqual(metadata["allowed_write_scope"], ["src/target.py"])
+            self.assertEqual(len(metadata["hidden_validator_hash"]), 64)
 
     def test_implementation_runner_denies_scope_escape(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -143,6 +152,48 @@ class BenchmarkRunnerTests(unittest.TestCase):
 
     def test_release_audit_accepts_current_registry_and_schemas(self):
         self.assertEqual(audit.audit(), [])
+
+    def test_holdout_tasks_rejected_without_flag(self):
+        import yaml
+        manifest = yaml.safe_load((ROOT / "benchmarks/manifest.yaml").read_text())
+        holdout = manifest["holdout"]["tasks"]
+        self.assertTrue(len(holdout) >= 3)
+        for task_id in holdout:
+            error = fixtures.check_holdout(task_id, manifest, False)
+            self.assertIsNotNone(error, task_id)
+            self.assertIsNone(fixtures.check_holdout(task_id, manifest, True), task_id)
+        self.assertIsNone(fixtures.check_holdout("BF-001", manifest, False))
+
+    def test_ablation_configs_isolate_components(self):
+        import yaml
+        manifest = yaml.safe_load((ROOT / "benchmarks/manifest.yaml").read_text())
+        ablations = {c["id"]: c for c in manifest.get("configurations-ablation", [])}
+        for expected in ("gravitas-enforcement-flash", "gravitas-context-flash",
+                         "gravitas-verification-flash"):
+            self.assertIn(expected, ablations, expected)
+            self.assertEqual(ablations[expected]["model"], "gemini-3.8-flash")
+            self.assertEqual(ablations[expected]["ablation_of"], "gravitas-native-flash")
+            self.assertTrue(ablations[expected]["varies"])
+
+    def test_bench_cli_doctor_and_build_corpus(self):
+        doctor = subprocess.run(
+            [sys.executable, str(ROOT / "benchmarks/cli.py"), "doctor"],
+            text=True, capture_output=True, cwd=ROOT, check=False)
+        self.assertEqual(doctor.returncode, 0, doctor.stdout + doctor.stderr)
+        with tempfile.TemporaryDirectory() as directory:
+            build = subprocess.run(
+                [sys.executable, str(ROOT / "benchmarks/cli.py"), "build-corpus",
+                 "--out", str(Path(directory) / "corpus")],
+                text=True, capture_output=True, cwd=ROOT, check=False)
+            self.assertEqual(build.returncode, 0, build.stderr)
+            self.assertEqual(json.loads(build.stdout)["built"], 30)
+
+    def test_hidden_test_deterministic_per_task(self):
+        self.assertEqual(fixtures.hidden_test_source("BF-001"),
+                         fixtures.hidden_test_source("BF-001"))
+        self.assertNotEqual(fixtures.hidden_test_source("BF-001"),
+                            fixtures.hidden_test_source("BF-002"))
+        self.assertEqual(len(fixtures.hidden_test_hash("BF-001")), 64)
 
 
 if __name__ == "__main__":

@@ -9,8 +9,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from fixtures import materialize
-from run import GeminiRequestError, api_key, generate_content, load_task, result_path
+from fixtures import check_holdout, hidden_test_source, materialize
+from run import GeminiRequestError, api_key, generate_content, load_manifest, load_task, result_path
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -81,6 +81,25 @@ def prompt(task, fixture, last_result):
     )
 
 
+def run_hidden_validation(worktree, task_id):
+    """Execute the withheld acceptance test against the final worktree.
+
+    The hidden test is copied into the worktree only after the trajectory
+    ends (the episode is over; nothing leaks to the solver).  Returns
+    {"passed": bool, "output": str}.
+    """
+    hidden_path = worktree / "tests" / "test_hidden_acceptance.py"
+    hidden_path.write_text(hidden_test_source(task_id))
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "unittest", "test_hidden_acceptance", "-v"],
+            cwd=worktree / "tests", capture_output=True, text=True, timeout=30, check=False)
+    finally:
+        hidden_path.unlink(missing_ok=True)
+    output = (result.stdout + result.stderr)[-4000:]
+    return {"passed": result.returncode == 0, "output": output}
+
+
 def run_episode(task, model, configuration, max_steps=12):
     worktree = Path(tempfile.mkdtemp(prefix=f"gravitas-{task['task_id']}-"))
     fixture = materialize(task["task_id"], worktree)
@@ -105,10 +124,10 @@ def run_episode(task, model, configuration, max_steps=12):
                 break
         else:
             error = "step limit reached"
-        validation = subprocess.run(ALLOWED_COMMAND.split(), cwd=worktree, capture_output=True, text=True, timeout=30, check=False)
-        test_passed = validation.returncode == 0
+        hidden_result = run_hidden_validation(worktree, task["task_id"])
+        test_passed = hidden_result["passed"]
         validators = [
-            {"criterion": "Fixture acceptance tests", "result": "PASS" if test_passed else "FAIL", "output": (validation.stdout + validation.stderr)[-4000:]},
+            {"criterion": "Hidden acceptance", "result": "PASS" if test_passed else "FAIL", "output": hidden_result["output"]},
             {"criterion": "Allowed write scope", "result": "FAIL" if scope_violation else "PASS", "output": "scope violation" if scope_violation else "within scope"},
         ]
     except (GeminiRequestError, subprocess.TimeoutExpired) as failure:
@@ -133,6 +152,7 @@ def run_episode(task, model, configuration, max_steps=12):
         "tokens": {name: value for name, value in tokens.items() if value},
         "git_diff": "synthetic disposable fixture; no repository diff retained",
         "validator_outputs": validators, "agent_final_response": final,
+        "hidden_validator_hash": fixture["hidden_validator_hash"],
         "claimed_success": bool(final), "functional_solve": solved,
         "false_completion": bool(final) and not solved, "premature_action": False,
         "scope_violation": scope_violation, "regression": False,
@@ -147,9 +167,14 @@ def main():
     parser.add_argument("--model", default="gemini-3.8-flash")
     parser.add_argument("--configuration", default="gemini-synthetic")
     parser.add_argument("--max-steps", type=int, default=12)
+    parser.add_argument("--include-holdout", action="store_true")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    episode = run_episode(load_task(args.task_file), args.model, args.configuration, args.max_steps)
+    task = load_task(args.task_file)
+    holdout_error = check_holdout(task["task_id"], load_manifest(), args.include_holdout)
+    if holdout_error:
+        parser.error(holdout_error)
+    episode = run_episode(task, args.model, args.configuration, args.max_steps)
     output = result_path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(episode, indent=2) + "\n")

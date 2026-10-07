@@ -23,6 +23,27 @@ def episode_errors(episode, schema, schema_validator=None):
     return errors
 
 
+def validate_episodes(episodes_dir, schema=None, schema_validator=None):
+    """Load and check every episode file. Returns (valid_episodes, invalid_count).
+
+    Aggregate arrays are skipped (not episodes); schema-invalid files raise
+    ValueError naming the file. Infrastructure-failure episodes are valid
+    episodes counted as invalid runs downstream, never silently dropped.
+    """
+    episodes, invalid = [], 0
+    for path in sorted(Path(episodes_dir).glob("*.json")):
+        payload = json.loads(path.read_text())
+        if isinstance(payload, list):
+            continue
+        errors = episode_errors(payload, schema, schema_validator) if schema else []
+        if errors:
+            raise ValueError(f"{path}: {'; '.join(errors)}")
+        episodes.append(payload)
+        if payload.get("infrastructure_failure"):
+            invalid += 1
+    return episodes, invalid
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", required=True)

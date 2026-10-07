@@ -140,6 +140,14 @@ def load_task(path):
     return task
 
 
+def load_manifest():
+    try:
+        import yaml
+    except ImportError as error:
+        raise RuntimeError("PyYAML is required: pip install -r benchmarks/runner/requirements.txt") from error
+    return yaml.safe_load((ROOT / "benchmarks" / "manifest.yaml").read_text())
+
+
 def result_path(path):
     resolved = Path(path).resolve()
     try:

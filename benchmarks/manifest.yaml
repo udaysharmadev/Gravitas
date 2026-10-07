@@ -125,3 +125,38 @@ configurations:
     effort: thinking
     gravitas: none
     label: Reference (Opus 4.6)
+
+# Holdout: final-evaluation tasks excluded from dev runs unless the runner
+# is invoked with --include-holdout. Synthetic fixtures cannot leak training
+# data (they are generated), but holdout discipline is enforced anyway so the
+# release pipeline is exercised before real fixtures arrive.
+holdout:
+  tasks: [FA-005, LH-001, UI-001]
+  policy: dev runs must exclude these tasks; final evaluation includes them
+
+# Ablations: matched harness variations isolating component contributions.
+# Primary ablations compare bare model / Core-only / enforcement-only /
+# context / verification / full Gravitas on the SAME model (section U).
+# Reference configs above stay exploratory, never the success criterion.
+configurations-ablation:
+  - id: gravitas-enforcement-flash
+    model: gemini-3.8-flash
+    effort: balanced
+    gravitas: enforcement-only
+    ablation_of: gravitas-native-flash
+    varies: hooks without SKILL.md (runtime enforcement, no instructions)
+    label: Ablation, enforcement only (no skill)
+  - id: gravitas-context-flash
+    model: gemini-3.8-flash
+    effort: balanced
+    gravitas: context-only
+    ablation_of: gravitas-native-flash
+    varies: skill with Context Engine, hooks disabled (no enforcement)
+    label: Ablation, context only (no hooks)
+  - id: gravitas-verification-flash
+    model: gemini-3.8-flash
+    effort: balanced
+    gravitas: verification-only
+    ablation_of: gravitas-native-flash
+    varies: skill with Verification Engine, read-only hooks (no write gating)
+    label: Ablation, verification only (no write gating)
