@@ -30,10 +30,16 @@ def load_jsonl(path: Path) -> list:
 
 
 def resume_context(session_dir: Path) -> dict:
+    """Minimum durable context plus the full handoff summary.
+
+    Top-level phase/next_action keys are kept for backward compatibility;
+    the nested ``summary`` carries the complete durable state.
+    """
+    from gravitas_context import summarize_session
     state = load_json(session_dir / "state.json")
     contract = load_json(session_dir / "contract.json")
     failures = load_jsonl(session_dir / "failures.jsonl")
-    return {
+    context = {
         "task_id": state.get("task_id", session_dir.name),
         "objective": contract.get("objective"),
         "mode": contract.get("mode"),
@@ -46,6 +52,8 @@ def resume_context(session_dir: Path) -> dict:
         "known_failures": [failure.get("error", failure.get("reason", "unknown")) for failure in failures if failure.get("resolved") is not True],
         "next_action": state.get("next_action"),
     }
+    context["summary"] = summarize_session(session_dir)
+    return context
 
 
 def main():

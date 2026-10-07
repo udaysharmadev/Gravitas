@@ -251,7 +251,7 @@ class RuntimeTests(unittest.TestCase):
         (session / "evidence.jsonl").write_text(json.dumps({"source": "write", "file": "module.py"}) + "\n")
         self.assertEqual(run_script("post_invocation.py", {}, cwd=self.cwd).returncode, 0)
         state = json.loads((session / "state.json").read_text())
-        self.assertEqual(state["impact_graph"]["module.py"]["callers"], ["consumer.py"])
+        self.assertEqual(state["impact_graph"]["module.py"]["callers"], ["consumer.py", "test_module.py"])
         self.assertEqual(state["verification_targets"], ["test_module.py"])
 
     def test_resume_session_emits_compact_state(self):

@@ -164,6 +164,30 @@ def cmd_decide(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_summarize(args: argparse.Namespace) -> int:
+    try:
+        from gravitas_context import summarize_session
+    except ModuleNotFoundError:
+        print(json.dumps({"error": f"runtime assets not found under {ROOT}; reinstall gravitas or run from a checkout"}))
+        return 1
+    session_dir = Path(args.session_dir)
+    if not (session_dir / "contract.json").exists() and not (session_dir / "state.json").exists():
+        print(json.dumps({"error": f"not a Gravitas session directory: {session_dir}"}))
+        return 1
+    print(json.dumps(summarize_session(session_dir), indent=2))
+    return 0
+
+
+def cmd_context(args: argparse.Namespace) -> int:
+    try:
+        from impact_graph import verification_context
+    except ModuleNotFoundError:
+        print(json.dumps({"error": f"runtime assets not found under {ROOT}; reinstall gravitas or run from a checkout"}))
+        return 1
+    print(json.dumps(verification_context(Path(args.root), args.changed, args.depth), indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="gravitas")
     sub = parser.add_subparsers(dest="subcommand", required=True)
@@ -175,6 +199,14 @@ def main() -> int:
     decide = sub.add_parser("decide", help="Emit a planning-policy record (planning, context/verification depth, delegation, reason codes) from --signals JSON")
     decide.add_argument("--signals", default="", help="JSON object of policy signals, e.g. '{\"dependent_files\": true, \"files\": 3}'")
     decide.set_defaults(func=cmd_decide)
+    summarize = sub.add_parser("summarize", help="Emit the durable compact session state for handoff or resume")
+    summarize.add_argument("--session-dir", required=True)
+    summarize.set_defaults(func=cmd_summarize)
+    context = sub.add_parser("context", help="Ranked repository context for changed files at a disclosure depth")
+    context.add_argument("--root", default=".")
+    context.add_argument("--changed", nargs="+", required=True)
+    context.add_argument("--depth", default="dependency", choices=["target", "dependency", "subsystem"])
+    context.set_defaults(func=cmd_context)
     bench = sub.add_parser("bench", help="GravitasBench reproducibility CLI (doctor, build-corpus, pilot, run, report)")
     bench.add_argument("bench_args", nargs=argparse.REMAINDER)
     bench.set_defaults(func=cmd_bench)

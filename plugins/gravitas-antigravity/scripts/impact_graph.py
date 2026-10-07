@@ -1,57 +1,83 @@
 #!/usr/bin/env python3
-"""Build a lightweight verification impact graph from changed source files."""
+"""Build verification impact targets from changed source files.
+
+Backed by the deterministic repository graph (gravitas_repo): real import
+edges, symbol references, test association, config discovery, and git
+co-change history. Output shape keeps the legacy keys (callers, tests,
+config) and adds importers, symbols, and co_changed.
+"""
 import argparse
 import json
-import re
 from pathlib import Path
 
-
-SOURCE_SUFFIXES = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".cs", ".rb", ".php"}
-SKIP_PARTS = {".git", ".gravitas", "node_modules", "__pycache__", "dist", "build", "target"}
+from gravitas_repo import context_for, get_index
 
 
-def source_files(root: Path):
-    for path in root.rglob("*"):
-        if path.suffix in SOURCE_SUFFIXES and not any(part in SKIP_PARTS for part in path.parts):
-            yield path
+def _normalize_changed(root: Path, changed: str) -> str | None:
+    candidate = Path(changed)
+    if candidate.is_absolute():
+        try:
+            relative = str(candidate.resolve().relative_to(root))
+        except ValueError:
+            return None
+    else:
+        relative = changed
+    if (root / relative).is_file():
+        return relative
+    return None
 
 
 def related_files(root: Path, changed: str) -> dict:
-    changed_path = (root / changed).resolve() if not Path(changed).is_absolute() else Path(changed).resolve()
-    name = changed_path.stem
-    pattern = re.compile(rf"\b{re.escape(name)}\b")
-    callers, tests = [], []
-    for path in source_files(root):
-        resolved = path.resolve()
-        if resolved == changed_path:
-            continue
-        try:
-            text = path.read_text(errors="ignore")
-        except OSError:
-            continue
-        relative = str(path.relative_to(root))
-        if pattern.search(text):
-            (tests if "test" in path.name.lower() or "test" in path.parts else callers).append(relative)
-    configs = [
-        str(path.relative_to(root)) for path in root.iterdir()
-        if path.name in {"pyproject.toml", "package.json", "tsconfig.json", "Cargo.toml", "go.mod", "pom.xml", "composer.json"}
-    ]
-    return {"callers": sorted(callers), "tests": sorted(tests), "config": sorted(configs)}
+    """Legacy-compatible per-file relations, graph-backed."""
+    index = get_index(root)
+    relative = _normalize_changed(root, changed)
+    if relative is None or relative not in index.get("files", {}):
+        return {"callers": [], "tests": [], "config": [],
+                "importers": [], "symbols": [], "co_changed": []}
+    info = index["files"][relative]
+    return {
+        "callers": info.get("callers", []),
+        "tests": info.get("tested_by", []),
+        "config": info.get("configured_by", []),
+        "importers": info.get("imported_by", []),
+        "symbols": info.get("symbols", []),
+        "co_changed": info.get("co_changed", []),
+    }
 
 
 def build_impact_graph(root: Path, changed_files: list[str]) -> tuple[dict, list[str]]:
-    graph = {changed: related_files(root, changed) for changed in sorted(set(changed_files))}
-    targets = sorted({target for related in graph.values() for target in related["tests"] + related["config"]})
+    root = root.resolve()
+    graph = {}
+    for changed in sorted(set(changed_files)):
+        relative = _normalize_changed(root, changed) or changed
+        graph[relative] = related_files(root, changed)
+    targets = sorted({target for related in graph.values()
+                      for target in related["tests"] + related["config"]})
     return graph, targets
+
+
+def verification_context(root: Path, changed_files: list[str], depth: str = "dependency") -> dict:
+    """Progressive-disclosure file set for a verification depth."""
+    root = root.resolve()
+    index = get_index(root)
+    normalized = [rel for c in changed_files if (rel := _normalize_changed(root, c))]
+    return context_for(index, normalized, depth)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Build Gravitas verification impact targets")
     parser.add_argument("--root", default=".")
     parser.add_argument("--changed", nargs="+", required=True)
+    parser.add_argument("--depth", default="dependency",
+                        choices=["target", "dependency", "subsystem"])
     args = parser.parse_args()
-    graph, targets = build_impact_graph(Path(args.root).resolve(), args.changed)
-    print(json.dumps({"impact_graph": graph, "verification_targets": targets}, indent=2))
+    root = Path(args.root).resolve()
+    graph, targets = build_impact_graph(root, args.changed)
+    print(json.dumps({
+        "impact_graph": graph,
+        "verification_targets": targets,
+        "context": verification_context(root, args.changed, args.depth),
+    }, indent=2))
 
 
 if __name__ == "__main__":
