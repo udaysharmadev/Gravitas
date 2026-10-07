@@ -3,7 +3,7 @@
 > Status: benchmark infrastructure verified; comparative results pending
 > Research-preview benchmark design · September 2026
 
-GravitasBench is a trajectory-level benchmark for measuring the reliability impact of the Gravitas harness on Gemini models in Antigravity.
+GravitasBench is a trajectory-level benchmark for measuring the reliability impact of the Gravitas harness across models and hosts. The initial supported configuration is Gemini models in Antigravity; OpenCode support is in progress.
 
 ## What GravitasBench Measures
 
@@ -25,14 +25,22 @@ GravitasBench does not measure answers. It measures episodes: complete task traj
 | Evidence Integrity | EI | verified_successes / claimed_successes | Are completion claims backed by evidence? |
 | Solves per Quota Unit | SQE | successful_tasks / quota_consumed | Efficiency: reliability per quota unit |
 
-## Claude Gap Closure
+## Cross-Model Reference (exploratory, not the primary metric)
 
-For each task suite:
+The primary GravitasBench comparison is within-model: baseline vs. Gravitas
+on the same model and task suite. Cross-model reference configurations may
+be included in a neutral matrix when scientifically useful, but competitor
+gap closure is not the product's success criterion.
+
+For a task suite, an exploratory reference delta may be reported as:
 ```
-Gap Closure = (Gravitas Gemini FSR - Baseline Gemini FSR) / (Claude reference FSR - Baseline Gemini FSR) x 100
+Reference delta = (Gravitas FSR - Baseline FSR) / (Reference-model FSR - Baseline FSR) x 100
 ```
 
-This measures how much of the Gemini-to-Claude reliability gap Gravitas closes on this task suite.
+This describes where a Gravitas-enabled run sits relative to an independent
+reference run on the same suite. It is not a claim about models, and it must
+always be published alongside absolute metrics, confidence intervals, and
+the exact reference model revision.
 
 ## Configuration Matrix
 

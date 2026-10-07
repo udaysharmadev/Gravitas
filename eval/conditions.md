@@ -124,21 +124,28 @@ For each run, collect:
 
 ## 6. Success Criteria
 
+> Direction: the primary comparison is within-model (treatment vs.
+> baseline on the same model). Cross-model reference deltas are exploratory
+> and never the product's success criterion.
+
 ### 6.1 Primary Success Criteria (v1)
 
-1. **B closes ≥70% of the gap to C** on false-completion rate and diff-scoping ratio.
-2. **B matches or exceeds C** on tasks favoring Gemini's native strengths.
+1. **B improves over A** on false-completion rate and diff-scoping ratio, with 95% CIs excluding zero.
+2. **D improves over C** on the same metrics (Gravitas generalizes across model families).
 3. **B's token overhead is <3× baseline.**
+4. **No metric regresses by >10%** in any condition.
 
 ### 6.2 Secondary Success Criteria (v1)
 
-1. **B improves over A** on all metrics (GRAVITAS helps Gemini).
-2. **D improves over C** on all metrics (GRAVITAS helps Claude).
-3. **No metric regresses by >10%** in any condition.
+1. **B improves over A** on all remaining metrics.
+2. Absolute gates: false-completion rate and evidence integrity meet the
+   pre-registered thresholds in `benchmarks/README.md`.
 
-### 6.3 Stretch Goals (v1)
+### 6.3 Exploratory (not success criteria)
 
-1. B matches C on task success rate (GRAVITAS makes Gemini competitive with Claude).
+1. Reference-model delta on task success rate (Gravitas-enabled run vs. an
+   independent reference run on the same suite -- report with exact model
+   revisions and CIs; see `eval/claude-parity.md`).
 2. B's token overhead is <2× baseline.
 3. D's token overhead is <1.5× baseline.
 

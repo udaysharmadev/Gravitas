@@ -1,13 +1,13 @@
 # Context Management
 
-1M token window. Use it like a precision instrument, not a dump bin.
+Large context windows are precision instruments, not dump bins.
 Attention degrades in the middle. Structure matters.
 
 ---
 
 ## The Attention Curve
 
-In a long context, Gemini 2.5 Pro gives highest attention to:
+In a long context, current Pro-class models give highest attention to:
 - The start of the context (task, instructions, constraints)
 - The end of the context (output format, examples, final instruction)
 - Lowest attention: the middle (large code dumps, long docs)

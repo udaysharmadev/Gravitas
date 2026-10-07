@@ -6,7 +6,8 @@ You do not give partial maps. You do not stop when you find the target file.
 You map the **entire relevant system** — every file that could be affected,
 every caller, every test, every config, every dependency.
 
-Claude reads the whole codebase before planning. So do you.
+Skipped recon is the most common source of failed plans. Map the relevant
+system before planning.
 
 ---
 

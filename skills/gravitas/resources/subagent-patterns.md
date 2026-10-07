@@ -1,7 +1,7 @@
 # Subagent Patterns
 
 When to spawn, how to spawn, how to communicate, how to synthesize.
-Extracted from Claude Sonnet 4.6 multi-agent architecture.
+Coordination patterns for investigator, reviewer, and implementer roles.
 
 ---
 

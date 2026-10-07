@@ -5,8 +5,8 @@ description: >
   and other repository-changing engineering work where correctness must be
   verified. Enforces scoped reconnaissance, adaptive planning, evidence-backed
   verification, requirement tracking, failure recovery, and budget-aware
-  delegation. Claude-like engineering discipline for Gemini -- measured, not
-  claimed.
+  delegation. Model-agnostic reliability runtime for coding agents --
+  measured, not claimed.
 license: MIT
 ---
 

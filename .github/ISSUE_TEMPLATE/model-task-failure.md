@@ -1,12 +1,12 @@
 ---
-name: Gemini failed a task
+name: Model failed a task
 about: Submit a reproducible task failure
-title: "[Gemini failure] "
+title: "[Model failure] "
 labels: benchmark-candidate
 ---
 
 Repository and commit:
-Model, effort, and Antigravity version:
+Model, effort, and host version:
 Exact task:
 Expected validator result:
 Observed result:

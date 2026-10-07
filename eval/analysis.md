@@ -113,34 +113,40 @@ adjusted_alpha = alpha / K
 
 ## 3. Success Criteria
 
+> Direction: primary comparisons are within-model (B vs. A, D vs. C).
+> Reference-model deltas are exploratory. No values below are measured;
+> every Status box is unchecked pending a release-grade dataset.
+
 ### 3.1 Primary Success Criteria (v1)
 
 | Criterion | Metric | Threshold | Status |
 |-----------|--------|-----------|--------|
-| B closes gap to C on false-completion | False-completion rate | ≥70% gap closed | [ ] |
-| B closes gap to C on diff-scoping | Diff scoping ratio | ≥70% gap closed | [ ] |
-| B matches C on Gemini-favoring tasks | Task success rate | B ≥ C | [ ] |
+| B improves over A on false-completion | False-completion rate | 95% CI excludes zero | [ ] |
+| B improves over A on diff-scoping | Diff scoping ratio | 95% CI excludes zero | [ ] |
+| D improves over C on false-completion | False-completion rate | 95% CI excludes zero | [ ] |
 | B's token overhead < 3× | Token overhead | < 3.0 | [ ] |
 
-### 3.2 Gap Closure Formula
+### 3.2 Reference-Model Delta (exploratory, not a success criterion)
 
 ```
-gap_closure = (A_score - B_score) / (A_score - C_score) * 100%
+reference_delta = (A_score - B_score) / (A_score - C_score) * 100%
 ```
 
 Where:
-- A_score = Gemini baseline
-- B_score = Gemini + GRAVITAS
-- C_score = Claude baseline
+- A_score = treatment-model baseline
+- B_score = treatment model + GRAVITAS
+- C_score = independent reference-model baseline (exact revision pinned)
 
-**Interpretation:** 100% = GRAVITAS closes the entire gap. 70% = closes 70% of the gap.
+**Interpretation:** 100% = the Gravitas-enabled run matches the reference run
+on this suite. Report only alongside absolute metrics, CIs, and the exact
+reference revision. Never the product's headline metric.
 
 ### 3.3 Secondary Success Criteria
 
 | Criterion | Metric | Threshold | Status |
 |-----------|--------|-----------|--------|
-| B improves over A | All metrics | B > A | [ ] |
-| D improves over C | All metrics | D > C | [ ] |
+| B improves over A | All metrics | B > A, CI excludes zero | [ ] |
+| D improves over C | All metrics | D > C, CI excludes zero | [ ] |
 | No regression > 10% | All metrics | No metric regresses > 10% | [ ] |
 
 ---
@@ -173,7 +179,7 @@ False-completion rate:
 | Medium (0.1-0.2) | Moderate precision | Report with caveat |
 | Wide (> 0.2) | Uncertain estimate | Note need for more data |
 
-### 4.3 Per-Pillar Breakdowns
+### 4.3 Per-Pillar Breakdowns (illustrative template -- values below are NOT measured)
 
 **Do not report only aggregate scores.** Report per-pillar breakdowns:
 
@@ -188,16 +194,16 @@ GRAVITAS had no significant effect on:
 - Failure-repetition rate (p = 0.18)
 ```
 
-### 4.4 Condition Comparisons
+### 4.4 Condition Comparisons (illustrative template -- values below are NOT measured)
 
 **Report each comparison:**
 
 | Comparison | Key Finding | Effect Size | Interpretation |
 |-----------|-------------|-------------|----------------|
-| A vs. B | GRAVITAS improves Gemini | d = 0.72 | Medium-large practical significance |
-| C vs. D | GRAVITAS improves Claude | d = 0.35 | Small-medium practical significance |
-| A vs. C | Claude baseline > Gemini baseline | d = 0.55 | Medium effect |
-| B vs. D | GRAVITAS narrows the gap | d = 0.15 | Small effect — gap narrowed |
+| A vs. B | GRAVITAS improves treatment model | d = 0.72 | Medium-large practical significance |
+| C vs. D | GRAVITAS improves reference-family model | d = 0.35 | Small-medium practical significance |
+| A vs. C | Baseline difference between families | d = 0.55 | Medium effect |
+| B vs. D | Cross-family delta after Gravitas | d = 0.15 | Small effect |
 
 ---
 

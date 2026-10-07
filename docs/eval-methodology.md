@@ -464,14 +464,17 @@ tokens:
 
 ### 7.1 Success Criteria
 
+> Direction: primary comparisons are within-model (B vs. A, D vs. C).
+> Cross-model reference deltas are exploratory and never the headline metric.
+
 **Primary success criteria (v1):**
-1. B closes ≥70% of the gap to C on false-completion rate and diff-scoping ratio.
-2. B matches or exceeds C on tasks favoring Gemini's native strengths.
+1. B improves over A on false-completion rate and diff-scoping ratio, with 95% CIs excluding zero.
+2. D improves over C on the same metrics (generalization across model families).
 3. B's token overhead is <3× baseline.
 
 **Secondary success criteria (v1):**
-1. B improves over A on all metrics (GRAVITAS helps Gemini).
-2. D improves over C on all metrics (GRAVITAS helps Claude).
+1. B improves over A on all metrics.
+2. D improves over C on all metrics.
 3. No metric regresses by >10% in any condition.
 
 ### 7.2 Reporting Standards
@@ -483,7 +486,7 @@ tokens:
 4. p-value (from Mann-Whitney U).
 5. Sample size.
 
-**Example:**
+**Example (illustrative template -- values below are NOT measured):**
 ```
 False-completion rate:
 - Gemini Baseline: 0.24 [95% CI: 0.14, 0.36]

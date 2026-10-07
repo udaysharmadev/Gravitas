@@ -22,6 +22,10 @@ prohibited = [
     "99% Claude",
     "Claude replacement",
     "better than Claude",
+    "Claude-like",
+    "like Claude",
+    "forces Gemini",
+    "competitive with Claude",
 ]
 lower = README.lower()
 for phrase in prohibited:

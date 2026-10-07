@@ -183,7 +183,7 @@ Strong — independent verification is well-established. Scope and escalation ar
 
 ### Research Basis
 - **Agentic Communication Benchmarks:** Outcome-first reporting improves perceived quality.
-- **Claude Sonnet 4.6:** "Report what actually happened, not what you intended." Evidence-based claims, failure-first reporting.
+- **Evidence-first reporting (industry practice):** "Report what actually happened, not what you intended." Evidence-based claims, failure-first reporting.
 - **Communication Research:** Presentation quality affects trust independently of correctness.
 
 ### Current GRAVITAS Spec
@@ -271,7 +271,7 @@ Moderate — tool selection optimization is preliminary. Context utilization is 
 ### Research Basis
 - **Constitutional AI (Bai et al., 2022):** Fixed rubric self-critique shapes behavior.
 - **Alignment Literature:** Sycophancy is a known failure mode across models.
-- **Claude Sonnet 4.6:** "Never be sycophantic — honesty about limitations is more valuable than false confidence."
+- **Sycophancy research:** Honesty about limitations is more valuable than false confidence.
 
 ### Current GRAVITAS Spec
 - Pushback decision criteria (when to push back, when NOT to).

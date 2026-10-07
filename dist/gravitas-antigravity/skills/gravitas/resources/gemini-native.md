@@ -1,7 +1,9 @@
-# Gemini-Native Optimizations
+# Model-Native Optimization Notes (Gemini tuned)
 
-Make Gemini perform at frontier-model level. Every pattern here is validated
-against Gemini 2.5 Pro and Flash architecture.
+These patterns were tuned on Gemini models. They generalize to other
+instruction-following coding models, but re-validate on each model you run:
+prompt-structure preferences and context-window behavior differ across
+model families.
 
 ---
 
@@ -79,13 +81,15 @@ Express.js API, TypeScript, connects to PostgreSQL
 ```
 
 **Note:** GRAVITAS uses markdown-first structure throughout. XML-style prompts
-are less effective on Gemini than on Claude.
+are less effective on Gemini than markdown headings.
 
 ---
 
-## 5. Context Window — 1M Tokens, Use Wisely
+## 5. Context Window — Large, But Use Wisely
 
-Gemini 2.5 Pro has ~1M token context. Key principles:
+Current Pro-class models offer very large context windows (order of 1M
+tokens; verify the exact limit for the model revision you run). Key
+principles:
 
 **Use large context for:**
 - Full codebase review
@@ -223,19 +227,19 @@ Don't be nice. Find real problems.
 
 ---
 
-## 11. Gemini vs Claude Differences (know them)
+## 11. Portability Notes (tuned on Gemini, re-validate elsewhere)
 
-| Behavior | Gemini | Claude |
-|---------|--------|--------|
-| Prompt structure | Markdown headings preferred | XML tags preferred |
-| Few-shot power | Very high | Very high |
-| Context use | 1M window, mid-degradation | 200K window, good throughout |
-| Tool parallelism | Native, fast | Native |
-| Reasoning | Thinking budget via API | Extended thinking |
-| Output verbosity | Needs constraints to be brief | Naturally varied |
+| Behavior | Tuned observation (Gemini) | When porting |
+|---------|---------------------------|--------------|
+| Prompt structure | Markdown headings preferred | Re-test on the target model |
+| Few-shot power | Very high | Very high on most models |
+| Context use | Large window, mid-degradation | Measure for the target model |
+| Tool parallelism | Native, fast | Depends on host support |
+| Reasoning | Thinking budget via API | Map to target API's effort control |
+| Output verbosity | Needs constraints to be brief | Re-tune brevity constraints |
 
-**Implication:** When porting Claude prompts to Gemini, replace `<tags>` with
-`## Headings` and explicitly constrain output length.
+**Implication:** When porting these patterns to another model, re-validate
+prompt structure and output-length constraints first; they vary the most.
 
 ---
 
