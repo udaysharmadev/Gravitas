@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 from evidence_chain import append_evidence, sha256
+from gravitas_action import confine_cwd
 
 
 def git_snapshot(cwd: Path) -> dict:
@@ -75,7 +76,11 @@ def main() -> int:
     command = args.command[1:]
     if not command:
         parser.error("validator command cannot be empty")
-    session_dir, cwd = Path(args.session_dir), Path(args.cwd).resolve()
+    session_dir, cwd_arg = Path(args.session_dir), args.cwd
+    try:
+        cwd = confine_cwd(cwd_arg)
+    except ValueError as error:
+        parser.error(str(error))
     try:
         validate_invocation(load_contract(session_dir), args.validator_id, args.criterion_id, command)
     except (OSError, ValueError, json.JSONDecodeError) as error:

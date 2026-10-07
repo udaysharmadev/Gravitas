@@ -109,7 +109,7 @@ CHECK_COMMANDS = (
 DESTRUCTIVE_BINARIES = frozenset({
     "dd", "truncate", "tee", "chmod", "chown",
     "docker", "kubectl", "terraform", "aws", "gcloud", "az",
-    "curl", "wget", "ssh", "scp",
+    "curl", "wget", "ssh", "scp", "rsync",
 })
 
 DESTRUCTIVE_GIT = frozenset({"reset", "clean", "checkout", "restore", "rm"})
@@ -121,6 +121,28 @@ _PIPE = re.compile(r"\|")
 
 def _basename(argv0: str) -> str:
     return argv0.rsplit("/", 1)[-1]
+
+
+def _operand_paths(segment: str) -> list[str]:
+    """Extract enumerable file operands (tee targets, dd of=).
+
+    Heuristic and incomplete by design: code-execution side effects
+    (interpreters, test runners) have no enumerable paths and are handled
+    by capability level, not scope.
+    """
+    try:
+        argv = shlex.split(segment, posix=True)
+    except ValueError:
+        return []
+    if not argv:
+        return []
+    binary = _basename(argv[0])
+    rest = argv[1:]
+    if binary == "tee":
+        return [arg for arg in rest if not arg.startswith("-") and arg not in ("--",)]
+    if binary == "dd":
+        return [arg[3:] for arg in rest if arg.startswith("of=") and len(arg) > 3]
+    return []
 
 
 def classify_shell_segment(segment: str) -> dict:
@@ -153,13 +175,14 @@ def classify_shell_segment(segment: str) -> dict:
     if binary in {"rm", "mv"}:
         return {"mutation": "destructive", "executable": binary, "argv": argv,
                 "reason": f"{binary} deletes or moves state"}
-    if binary in {"cp", "touch", "mkdir", "ln", "sed"}:
+    if binary in {"cp", "touch", "mkdir", "ln", "sed", "patch", "tar", "unzip", "zip", "install",
+                   "ed", "ex", "vi", "vim", "nano", "emacs"}:
         if binary == "sed" and not any(arg == "-i" or arg.startswith("-i") or arg == "--in-place" for arg in rest):
             return {"mutation": "none", "executable": binary, "argv": argv,
                     "reason": "sed without -i only filters text"}
         return {"mutation": "mutation", "executable": binary, "argv": argv,
                 "reason": f"{binary} writes files"}
-    if binary in {"python", "python3", "node", "deno", "ruby", "php", "bash", "sh"}:
+    if binary in {"python", "python3", "node", "deno", "ruby", "php", "perl", "bash", "sh"}:
         if rest[:1] in (["-c"], ["-e"], ["--eval"]):
             return {"mutation": "mutation", "executable": binary, "argv": argv,
                     "reason": f"{binary} {rest[0]} executes arbitrary code"}
@@ -211,8 +234,6 @@ def classify_shell(command: str) -> dict:
     text = command.strip()
     if not text:
         return {"mutation": "none", "reason": "empty command"}
-    if _SUBSTITUTION.search(text):
-        return {"mutation": "mutation", "reason": "command substitution executes nested code"}
     segments = [seg for seg in re.split(r"[;&|]+", text) if seg.strip()]
     worst = "none"
     reasons = []
@@ -220,6 +241,11 @@ def classify_shell(command: str) -> dict:
     argv: list = []
     paths: list = []
     network = bool(re.search(r"\bcurl\b|\bwget\b|\bssh\b|\bscp\b", text))
+    if _SUBSTITUTION.search(text):
+        # Floor, not verdict: substitution executes nested code, but the
+        # outer segments may still be destructive (e.g. curl $(id)).
+        worst = "mutation"
+        reasons.append("command substitution executes nested code")
     if _PIPE.search(text):
         worst = "mutation"
         reasons.append("pipeline moves data between processes")
@@ -228,6 +254,11 @@ def classify_shell(command: str) -> dict:
         reasons.append("redirection writes outside argv")
         for match in re.finditer(r"(?:>|>>|<)\s*(\S+)", text):
             paths.append(match.group(1))
+    for segment in segments:
+        operand_paths = _operand_paths(segment)
+        for operand in operand_paths:
+            if operand not in paths:
+                paths.append(operand)
     for segment in segments:
         result = classify_shell_segment(segment)
         if LEVELS.index(result["mutation"]) > LEVELS.index(worst):
@@ -304,3 +335,22 @@ def workspace_roots(envelope: HostEnvelope | None) -> list[Path]:
     if envelope and envelope.workspace_roots:
         return [Path(value).resolve(strict=False) for value in envelope.workspace_roots]
     return [Path.cwd().resolve()]
+
+
+def confine_cwd(raw: str) -> Path:
+    """Resolve a runner --cwd and refuse escape from the invoking directory.
+
+    Owned execution (validator_runner, repro_runner) must not be steered
+    to /etc, $HOME, or sibling checkouts via --cwd. The directory must
+    exist inside the process working directory after symlink resolution.
+    Raises ValueError on escape.
+    """
+    import os
+    base = os.path.realpath(os.getcwd())
+    candidate = os.path.realpath(os.path.join(base, raw))
+    if candidate != base and not candidate.startswith(base + os.sep):
+        raise ValueError(f"--cwd escapes the workspace: {raw!r} resolves outside {base}")
+    resolved = Path(candidate)
+    if not resolved.is_dir():
+        raise ValueError(f"--cwd is not a directory: {raw!r}")
+    return resolved

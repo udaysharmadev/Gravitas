@@ -20,6 +20,7 @@
     "validator_id": {"type": "string"},
     "criterion_ids": {"type": "array", "items": {"type": "string"}},
     "phase": {"type": "string", "description": "Reproduction phase: before (failing evidence) or after (fix verification)."},
+    "sensitive": {"type": "boolean", "description": "Read touched a likely secret-bearing file; treat retained content accordingly."},
     "reason": {"type": "string", "description": "Why reproduction is impossible (UNVERIFIABLE records)."},
     "exit_code": {"type": "integer"},
     "command_sha256": {"type": "string"},

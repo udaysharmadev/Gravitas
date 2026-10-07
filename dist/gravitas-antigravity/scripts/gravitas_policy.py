@@ -92,6 +92,18 @@ def evaluate_action(action: Action, *, mode: str, allowed_scope: list,
                     f"Scope violation: {target} is outside allowed_write_scope {allowed_scope}. "
                     f"Update the task contract to include this path if the write is intentional.")
 
+    # 2b. Enumerable shell writes obey the same scope. Only paths the
+    # runtime can enumerate (redirects, tee/dd operands) are checked;
+    # code-execution side effects are governed by capability level, and
+    # TOCTOU races between check and execution are a documented limit.
+    if allowed_scope and action.kind in ("execute", "network") and action.paths and action.mutation != "none":
+        stray = [path for path in action.paths
+                 if not target_in_scope(path, allowed_scope, roots)]
+        if stray:
+            return ("deny",
+                    f"Scope violation: shell writes to {stray} outside allowed_write_scope {allowed_scope}. "
+                    f"Update the task contract to include these paths if the writes are intentional.")
+
     # 3. Destructive operations require explicit host-side confirmation.
     if action.mutation == "destructive":
         return ("force_ask", "Destructive operation requires explicit user confirmation.")

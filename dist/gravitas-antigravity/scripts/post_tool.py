@@ -55,6 +55,28 @@ SECRET_PATTERNS = (
     (re.compile(r"(?i)\b([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|API_KEY|PASSWORD)\s*[:=]\s*)([^\s,;]+)"), r"\1[REDACTED]"),
 )
 
+#: Reads are never denied (debugging needs .env), but reads of likely
+#: secret-bearing files are flagged so retention policy can treat them
+#: differently. Whole path-segment matching only -- "tokenizer.py" must
+#: not match, "secrets.yaml" must.
+SENSITIVE_NAMES = frozenset({".env", ".envrc", "credentials.json", ".npmrc", ".pypirc"})
+SENSITIVE_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
+SENSITIVE_SEGMENTS = frozenset({
+    "secret", "secrets", "credential", "credentials", "token", "tokens",
+    "password", "passwords", "private", "id_rsa", "id_ed25519",
+})
+
+
+def is_sensitive_path(target: str) -> bool:
+    lowered = target.replace("\\", "/").lower()
+    name = lowered.rsplit("/", 1)[-1]
+    if name in SENSITIVE_NAMES or name.startswith(".env."):
+        return True
+    if name.endswith(SENSITIVE_SUFFIXES):
+        return True
+    segments = re.split(r"[^a-z0-9_]+", name)
+    return any(segment in SENSITIVE_SEGMENTS for segment in segments)
+
 
 def redact_text(value: object, limit: int = 1000) -> str:
     """Remove common credentials before durable evidence logging."""
@@ -96,7 +118,8 @@ def main():
             append_evidence(session_dir, {
                 "source": "read",
                 "file": target,
-                "timestamp": timestamp
+                "timestamp": timestamp,
+                **({"sensitive": True} if is_sensitive_path(target) else {}),
             })
 
     # Record failures for duplicate prevention

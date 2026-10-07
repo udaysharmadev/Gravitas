@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 
 from evidence_chain import append_evidence, sha256
+from gravitas_action import confine_cwd
 from post_tool import redact_text
 
 
@@ -83,7 +84,10 @@ def main() -> int:
     command = args.command[1:]
     if not command:
         parser.error("reproducer command cannot be empty")
-    cwd = Path(args.cwd).resolve()
+    try:
+        cwd = confine_cwd(args.cwd)
+    except ValueError as error:
+        parser.error(str(error))
     start = time.monotonic()
     result = subprocess.run(command, cwd=cwd, text=True, capture_output=True, check=False)
     elapsed_ms = round((time.monotonic() - start) * 1000)
