@@ -16,5 +16,22 @@ dependencies = [
 [project.scripts]
 gravitas = "gravitas_cli:main"
 
+# Runtime assets mirrored under sys.prefix/share/gravitas/ so the installed
+# `gravitas` console script works outside a repository checkout. Layout
+# mirrors the repo root (plugins/..., skills/...); see installed_assets_root().
+[tool.setuptools.data-files]
+"share/gravitas/plugins/gravitas-antigravity" = [
+  "plugins/gravitas-antigravity/plugin.json",
+  "plugins/gravitas-antigravity/hooks.json",
+]
+"share/gravitas/plugins/gravitas-antigravity/scripts" = ["plugins/gravitas-antigravity/scripts/*.py"]
+"share/gravitas/plugins/gravitas-antigravity/agents" = ["plugins/gravitas-antigravity/agents/*.md"]
+"share/gravitas/skills/gravitas" = ["skills/gravitas/SKILL.md", "skills/gravitas/PROMPT-TEMPLATE.md"]
+"share/gravitas/skills/gravitas/agents" = ["skills/gravitas/agents/*.md"]
+"share/gravitas/skills/gravitas/references" = ["skills/gravitas/references/*.md"]
+"share/gravitas/skills/gravitas/resources" = ["skills/gravitas/resources/*.md"]
+"share/gravitas/skills/gravitas/scripts" = ["skills/gravitas/scripts/*.py", "skills/gravitas/scripts/*.sh"]
+"share/gravitas/schemas" = ["schemas/*.json"]
+
 [tool.setuptools]
 py-modules = ["gravitas_cli"]

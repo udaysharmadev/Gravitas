@@ -12,18 +12,46 @@ from pathlib import Path
 MODULE_ROOT = Path(__file__).resolve().parent
 
 
+def installed_assets_root() -> Path | None:
+    """Location of runtime assets shipped inside the wheel (sys.prefix/share).
+
+    The wheel lays files out under share/gravitas/ mirroring the repository
+    root (plugins/..., skills/...), so the rest of the CLI works unchanged.
+    """
+    candidate = Path(sys.prefix) / "share" / "gravitas" / "plugins" / "gravitas-antigravity"
+    if (candidate / "scripts").is_dir():
+        return candidate.parents[1]  # share/gravitas/ mirrors the repo layout root
+    return None
+
+
 def runtime_root() -> Path:
-    """Prefer the native plugin checkout when the console script is installed."""
+    """Resolve runtime assets: checkout first, installed distribution next."""
     checkout = Path.cwd()
     if (checkout / "plugins" / "gravitas-antigravity" / "scripts").is_dir():
         return checkout
+    if (MODULE_ROOT / "plugins" / "gravitas-antigravity" / "scripts").is_dir():
+        return MODULE_ROOT
+    installed = installed_assets_root()
+    if installed is not None:
+        return installed
     return MODULE_ROOT
+
+
+def runtime_mode() -> str:
+    checkout = Path.cwd()
+    if (checkout / "plugins" / "gravitas-antigravity" / "scripts").is_dir():
+        return "checkout(cwd)"
+    if (MODULE_ROOT / "plugins" / "gravitas-antigravity" / "scripts").is_dir():
+        return "checkout(module)"
+    if installed_assets_root() is not None:
+        return "installed"
+    return "unresolved"
 
 
 ROOT = runtime_root()
 SCRIPTS = ROOT / "plugins" / "gravitas-antigravity" / "scripts"
-sys.path.insert(0, str(SCRIPTS))
-from evidence_chain import verify_chain  # noqa: E402
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 
 
 def sessions(root: Path) -> list[Path]:
@@ -32,14 +60,41 @@ def sessions(root: Path) -> list[Path]:
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
+    """Check the effective runtime plus the other two supported contexts.
+
+    Modes: repository checkout (cwd or module dir), installed distribution
+    (sys.prefix/share), or a configured user project (cwd with .gravitas/).
+    Each scope is reported separately so failures point at the right layer.
+    """
+    native = ROOT / "plugins" / "gravitas-antigravity"
     checks = {
+        "mode": runtime_mode(),
+        "runtime_root": str(ROOT),
         "skill": (ROOT / "skills/gravitas/SKILL.md").is_file(),
-        "plugin_manifest": (ROOT / "plugin.json").is_file(),
-        "hooks": (ROOT / "hooks.json").is_file(),
+        "plugin_manifest": (native / "plugin.json").is_file(),
+        "hooks": (native / "hooks.json").is_file(),
         "validator_runner": (SCRIPTS / "validator_runner.py").is_file(),
+        "pre_tool_hook": (SCRIPTS / "pre_tool.py").is_file(),
+        "stop_gate_hook": (SCRIPTS / "stop_gate.py").is_file(),
+        "evidence_chain": (SCRIPTS / "evidence_chain.py").is_file(),
+        "project_session_store": (Path.cwd() / ".gravitas" / "sessions").is_dir(),
     }
     print(json.dumps(checks, indent=2))
-    return 0 if all(checks.values()) else 1
+    required = ["skill", "plugin_manifest", "hooks", "validator_runner", "pre_tool_hook", "stop_gate_hook", "evidence_chain"]
+    return 0 if all(checks[key] for key in required) else 1
+
+
+def cmd_bench(args: argparse.Namespace) -> int:
+    """Delegate to the GravitasBench CLI (requires a repository checkout)."""
+    bench_cli = ROOT / "benchmarks" / "cli.py"
+    if not bench_cli.is_file():
+        print(json.dumps({"error": "benchmarks/cli.py not found; `gravitas bench` requires a Gravitas repository checkout"}))
+        return 1
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("gravitas_bench_cli", bench_cli)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.main(["bench", *args.bench_args])
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -55,6 +110,11 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_verify(args: argparse.Namespace) -> int:
     target = Path(args.session_dir) / "evidence.jsonl"
+    try:
+        from evidence_chain import verify_chain
+    except ModuleNotFoundError:
+        print(json.dumps({"valid": False, "reason": f"runtime assets not found under {ROOT}; reinstall gravitas or run from a checkout", "ledger": str(target)}))
+        return 1
     valid, reason = verify_chain(target)
     print(json.dumps({"valid": valid, "reason": reason, "ledger": str(target)}))
     return 0 if valid else 1
@@ -90,6 +150,9 @@ def main() -> int:
     verify = sub.add_parser("verify"); verify.add_argument("--session-dir", required=True); verify.set_defaults(func=cmd_verify)
     gc = sub.add_parser("gc"); gc.add_argument("--older-than-days", type=int, default=30); gc.add_argument("--apply", action="store_true", help="delete instead of reporting"); gc.set_defaults(func=cmd_gc)
     validator = sub.add_parser("validator"); validator.add_argument("--session-dir", required=True); validator.add_argument("--validator-id", required=True); validator.add_argument("--criterion-id", action="append", default=[]); validator.add_argument("command", nargs=argparse.REMAINDER); validator.set_defaults(func=cmd_validator)
+    bench = sub.add_parser("bench", help="GravitasBench reproducibility CLI (doctor, build-corpus, pilot, run, report)")
+    bench.add_argument("bench_args", nargs=argparse.REMAINDER)
+    bench.set_defaults(func=cmd_bench)
     args = parser.parse_args()
     return args.func(args)
 
