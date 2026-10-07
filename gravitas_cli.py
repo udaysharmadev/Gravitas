@@ -97,7 +97,7 @@ def cmd_bench(args: argparse.Namespace) -> int:
     spec = importlib.util.spec_from_file_location("gravitas_bench_cli", bench_cli)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.main(["bench", *args.bench_args])
+    return module.main(list(args.bench_args))
 
 
 def cmd_status(args: argparse.Namespace) -> int:

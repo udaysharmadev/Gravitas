@@ -123,6 +123,11 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("installed", json.loads(result.stdout))
 
+    def test_bench_doctor_delegates(self):
+        result = cli("bench", "doctor", cwd=ROOT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Benchmark readiness: PASS", result.stdout)
+
 
 class DoctorTests(unittest.TestCase):
     def test_doctor_reports_adapter_and_project_keys(self):
