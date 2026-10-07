@@ -78,6 +78,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "stop_gate_hook": (SCRIPTS / "stop_gate.py").is_file(),
         "evidence_chain": (SCRIPTS / "evidence_chain.py").is_file(),
         "project_session_store": (Path.cwd() / ".gravitas" / "sessions").is_dir(),
+        "adapters": (ROOT / "adapters" / "opencode" / "contract-template.json").is_file(),
+        "project_opencode_contract": (Path.cwd() / ".gravitas" / "opencode-contract.json").is_file(),
+        "project_opencode_skill": (Path.cwd() / ".agents" / "skills" / "gravitas" / "SKILL.md").is_file(),
     }
     print(json.dumps(checks, indent=2))
     required = ["skill", "plugin_manifest", "hooks", "validator_runner", "pre_tool_hook", "stop_gate_hook", "evidence_chain"]
@@ -327,11 +330,136 @@ def cmd_init(args: argparse.Namespace) -> int:
     if args.host == "opencode":
         from gravitas_init import init_opencode
         result = init_opencode(root, profile=args.profile, source_root=source_root)
-    else:
+    elif args.host == "antigravity":
         from gravitas_init import init_antigravity
         result = init_antigravity(root, source_root=source_root)
+    else:
+        from gravitas_init import detect_hosts, init_antigravity, init_opencode
+        hosts = detect_hosts(root) or ["opencode"]
+        results = []
+        for host in hosts:
+            if host == "opencode":
+                results.append(init_opencode(root, profile=args.profile, source_root=source_root))
+            else:
+                results.append(init_antigravity(root, source_root=source_root))
+        result = {"ok": all(r.get("ok") for r in results), "hosts": hosts, "results": results}
     print(json.dumps(result, indent=2))
     return 0 if result.get("ok") else 1
+
+
+def cmd_explain(args: argparse.Namespace) -> int:
+    """Render what a session is, what is proven, and what is next."""
+    try:
+        from gravitas_context import summarize_session
+        from gravitas_evidence import evidence_deficit
+    except ModuleNotFoundError:
+        print(json.dumps({"error": f"runtime assets not found under {ROOT}"}))
+        return 1
+    session_dir = Path(args.session_dir)
+    if not session_dir.is_dir():
+        message = f"not a session directory: {session_dir}"
+        print(json.dumps({"error": message}) if args.json else message)
+        return 1
+    summary = summarize_session(session_dir)
+    contract_path = session_dir / "contract.json"
+    try:
+        contract = json.loads(contract_path.read_text()) if contract_path.exists() else {}
+    except json.JSONDecodeError:
+        contract = {}
+    states = summary.get("acceptance_criteria", {})
+    deficit = evidence_deficit(contract if isinstance(contract, dict) else {}, {
+        key: {"statement": value.get("statement", key), "status": value.get("status", "PENDING"),
+              "stale_owned": 0}
+        for key, value in states.items()})
+    if args.json:
+        print(json.dumps({**summary, "deficit": deficit}, indent=2))
+        return 0
+    lines = [
+        f"Session: {summary.get('session')}  (mode={summary.get('mode')}, phase={summary.get('phase')})",
+        f"Objective: {summary.get('objective')}",
+        "",
+        "Acceptance criteria:",
+    ]
+    for identifier, info in states.items():
+        lines.append(f"  [{info.get('status', 'PENDING')}] {identifier}: {info.get('statement', '')}")
+    if deficit:
+        lines.append("")
+        lines.append("Evidence deficit (what to do next):")
+        for item in deficit:
+            lines.append(f"  - {item['criterion']} ({item['status']}): {item['needed']}")
+    else:
+        lines.append("")
+        lines.append("No evidence deficit. Ready for the completion gate.")
+    failed = summary.get("failed_approaches", [])
+    if failed:
+        lines.append("")
+        lines.append(f"Failed approaches ({len(failed)} -- do not retry identically):")
+        for entry in failed[:5]:
+            lines.append(f"  - {entry.get('tool')}: {str(entry.get('cause', ''))[:120]}")
+    if summary.get("next_action"):
+        lines.append("")
+        lines.append(f"Next action: {summary['next_action']}")
+    print("\n".join(lines))
+    return 0
+
+
+def cmd_migrate(args: argparse.Namespace) -> int:
+    """Normalize legacy session contracts in place (mode aliases only)."""
+    try:
+        from gravitas_policy import MODE_ALIASES, MODES
+    except ModuleNotFoundError:
+        print(json.dumps({"error": f"runtime assets not found under {ROOT}"}))
+        return 1
+    root = Path(args.root)
+    session_base = root / ".gravitas" / "sessions"
+    migrated, issues = [], []
+    if session_base.is_dir():
+        for contract_path in sorted(session_base.glob("*/contract.json")):
+            try:
+                contract = json.loads(contract_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as error:
+                issues.append({"contract": str(contract_path), "issue": f"unreadable: {error}"})
+                continue
+            if not isinstance(contract, dict):
+                issues.append({"contract": str(contract_path), "issue": "not an object"})
+                continue
+            mode = contract.get("mode")
+            if mode in MODE_ALIASES:
+                contract["mode"] = MODE_ALIASES[mode]
+                contract_path.write_text(json.dumps(contract, indent=2) + "\n", encoding="utf-8")
+                migrated.append({"contract": str(contract_path),
+                                 "mode": f"{mode} -> {contract['mode']}"})
+            elif mode not in MODES:
+                issues.append({"contract": str(contract_path), "issue": f"unknown mode: {mode!r}"})
+            if not contract.get("acceptance_criteria"):
+                issues.append({"contract": str(contract_path), "issue": "no acceptance criteria"})
+    result = {"ok": True, "migrated": migrated, "issues": issues}
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_update(args: argparse.Namespace) -> int:
+    """Report installed vs latest release (offline-tolerant)."""
+    try:
+        from importlib.metadata import version as package_version
+        installed = package_version("gravitas")
+    except Exception:  # noqa: BLE001 -- metadata may be absent in checkouts
+        installed = "checkout"
+    if not args.check:
+        print(json.dumps({"installed": installed,
+                          "hint": "run `gravitas update --check` to query PyPI, then `pip install -U gravitas`"}))
+        return 0
+    import urllib.request
+    try:
+        with urllib.request.urlopen("https://pypi.org/pypi/gravitas/json", timeout=10) as response:
+            latest = json.loads(response.read())["info"]["version"]
+    except Exception as error:  # noqa: BLE001 -- offline is an expected state
+        print(json.dumps({"installed": installed, "latest": "unknown",
+                          "reason": f"offline or unreachable: {error}"}))
+        return 0
+    print(json.dumps({"installed": installed, "latest": latest,
+                      "update_available": installed != "checkout" and installed != latest}))
+    return 0
 
 
 def main() -> int:
@@ -376,11 +504,21 @@ def main() -> int:
     guard.add_argument("--envelope", default="", help="HostEnvelope JSON; reads stdin when empty")
     guard.add_argument("--contract", default="", help="Workspace contract JSON path (default: .gravitas/opencode-contract.json)")
     guard.set_defaults(func=cmd_guard)
-    init = sub.add_parser("init", help="Scaffold host configuration (opencode, antigravity) in a project")
-    init.add_argument("--host", required=True, choices=["opencode", "antigravity"])
+    init = sub.add_parser("init", help="Scaffold host configuration (auto-detects opencode/antigravity markers)")
+    init.add_argument("--host", default="auto", choices=["auto", "opencode", "antigravity"])
     init.add_argument("--profile", default="balanced", choices=["fast", "balanced", "strict"])
     init.add_argument("--root", default=".")
     init.set_defaults(func=cmd_init)
+    explain = sub.add_parser("explain", help="Render a human-readable session explanation (state, evidence, next actions)")
+    explain.add_argument("--session-dir", required=True)
+    explain.add_argument("--json", action="store_true", help="Emit machine-readable summary instead of text")
+    explain.set_defaults(func=cmd_explain)
+    migrate = sub.add_parser("migrate", help="Migrate legacy session contracts (mode aliases, schema hygiene)")
+    migrate.add_argument("--root", default=".")
+    migrate.set_defaults(func=cmd_migrate)
+    update = sub.add_parser("update", help="Check for a newer gravitas release (offline-tolerant)")
+    update.add_argument("--check", action="store_true", help="Query PyPI for the latest version")
+    update.set_defaults(func=cmd_update)
     bench = sub.add_parser("bench", help="GravitasBench reproducibility CLI (doctor, build-corpus, pilot, run, report)")
     bench.add_argument("bench_args", nargs=argparse.REMAINDER)
     bench.set_defaults(func=cmd_bench)

@@ -38,6 +38,15 @@ jobs:
       - name: Smoke-test installed CLI
         run: gravitas doctor
 
+      - name: Package build and clean install smoke test
+        run: |
+          python -m pip install build
+          python -m build --outdir /tmp/gravitas-pkg
+          python -m pip install --force-reinstall --no-deps /tmp/gravitas-pkg/*.whl
+          cd /tmp && gravitas doctor
+          cd /tmp && gravitas decide --signals '{}'
+          cd /tmp && python -c "import gravitas_init; print(gravitas_init.detect_hosts('.'))"
+
       - name: Validate portable skill structure
         run: python .github/scripts/validate_skill.py
 

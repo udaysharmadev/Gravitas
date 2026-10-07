@@ -31,7 +31,12 @@ class PackagingTests(unittest.TestCase):
             "plugins/gravitas-antigravity/scripts/stop_gate.py",
             "plugins/gravitas-antigravity/scripts/evidence_chain.py",
             "plugins/gravitas-antigravity/scripts/validator_runner.py",
+            "plugins/gravitas-antigravity/scripts/gravitas_action.py",
+            "plugins/gravitas-antigravity/scripts/gravitas_policy.py",
             "skills/gravitas/SKILL.md",
+            "adapters/opencode/contract-template.json",
+            "adapters/opencode/plugin/gravitas.js",
+            "adapters/opencode/permissions/balanced.json",
         ]:
             self.assertIn(asset, shipped, f"wheel data-files omit {asset}")
 

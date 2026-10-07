@@ -15,6 +15,28 @@ AGENTS_START = "<!-- GRAVITAS-OPENCODE-START"
 AGENTS_END = "GRAVITAS-OPENCODE-END -->"
 
 
+def detect_hosts(root: Path) -> list[str]:
+    """Detect configured hosts from project markers (no guessing)."""
+    root = Path(root)
+    hosts = []
+    if ((root / "opencode.json").exists() or (root / "opencode.jsonc").exists()
+            or (root / ".opencode").is_dir()):
+        hosts.append("opencode")
+    if (root / ".agents").is_dir() or (root / "AGENTS.md").exists():
+        hosts.append("antigravity")
+    return hosts
+
+
+def detect_ecosystem(root: Path) -> dict:
+    """Describe language and discovered validators for init output."""
+    try:
+        from gravitas_verify import discover_validators
+        catalog = discover_validators(Path(root))
+        return {"validators": catalog["validators"], "ci": catalog.get("ci", [])}
+    except Exception:  # noqa: BLE001 -- discovery is advisory; init must not fail
+        return {"validators": [], "ci": []}
+
+
 def _copy_tree(source: Path, dest: Path, installed: list, skipped: list) -> None:
     for item in sorted(source.rglob("*")):
         if item.is_dir():
@@ -96,8 +118,13 @@ def init_opencode(root: Path, *, profile: str = "balanced", source_root: Path) -
         shutil.copy2(adapter / "contract-template.json", contract_target)
         installed.append(str(contract_target))
 
+    # Discovered validators are reported, not auto-bound: binding a
+    # validator to acceptance criteria is a task decision, not scaffolding.
+    ecosystem = detect_ecosystem(root)
     return {"ok": True, "host": "opencode", "profile": profile,
-            "root": str(root), "installed": installed, "skipped": skipped}
+            "root": str(root), "installed": installed, "skipped": skipped,
+            "detected_validators": [v["id"] for v in ecosystem["validators"]],
+            "detected_ci": ecosystem["ci"]}
 
 
 def init_antigravity(root: Path, *, source_root: Path) -> dict:
