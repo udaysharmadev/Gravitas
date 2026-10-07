@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from session_context import session_dir_for_payload
 from evidence_chain import append_evidence
+from gravitas_action import antigravity_envelope, target_file
 
 
 READ_TOOLS = {
@@ -31,16 +32,10 @@ WRITE_TOOLS = {
 
 def tool_call(payload: object) -> tuple[str, dict]:
     """Read the Antigravity 2.x hook payload, with v4-preview compatibility."""
-    if not isinstance(payload, dict):
+    envelope, _ = antigravity_envelope(payload)
+    if envelope is None:
         return "", {}
-    call = payload.get("toolCall")
-    if isinstance(call, dict):
-        name, args = call.get("name"), call.get("args", {})
-    else:
-        name, args = payload.get("tool_name"), payload.get("tool_input", {})
-    if not isinstance(name, str) or not isinstance(args, dict):
-        return "", {}
-    return name, args
+    return envelope.tool, envelope.args
 
 
 def action_fingerprint(tool_name: str, tool_input: dict) -> str:
@@ -77,12 +72,6 @@ def redact_value(value: object) -> object:
     if isinstance(value, list):
         return [redact_value(item) for item in value]
     return value
-
-
-def target_file(tool_name: str, tool_input: dict) -> str:
-    if tool_name == "view_file":
-        return tool_input.get("AbsolutePath", tool_input.get("absolute_path", ""))
-    return tool_input.get("TargetFile", tool_input.get("target_file", ""))
 
 
 def main():

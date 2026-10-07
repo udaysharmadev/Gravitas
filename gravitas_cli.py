@@ -142,6 +142,28 @@ def cmd_validator(args: argparse.Namespace) -> int:
     return subprocess.run(command, check=False).returncode
 
 
+def cmd_decide(args: argparse.Namespace) -> int:
+    """Emit a machine-readable planning-policy record from signals JSON."""
+    try:
+        from gravitas_policy import decide
+    except ModuleNotFoundError:
+        print(json.dumps({"error": f"runtime assets not found under {ROOT}; reinstall gravitas or run from a checkout"}))
+        return 1
+    if args.signals:
+        try:
+            signals = json.loads(args.signals)
+        except json.JSONDecodeError as error:
+            print(json.dumps({"error": f"signals is not valid JSON: {error}"}))
+            return 1
+    else:
+        signals = {}
+    if not isinstance(signals, dict):
+        print(json.dumps({"error": "signals must be a JSON object"}))
+        return 1
+    print(json.dumps(decide(signals), indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="gravitas")
     sub = parser.add_subparsers(dest="subcommand", required=True)
@@ -150,6 +172,9 @@ def main() -> int:
     verify = sub.add_parser("verify"); verify.add_argument("--session-dir", required=True); verify.set_defaults(func=cmd_verify)
     gc = sub.add_parser("gc"); gc.add_argument("--older-than-days", type=int, default=30); gc.add_argument("--apply", action="store_true", help="delete instead of reporting"); gc.set_defaults(func=cmd_gc)
     validator = sub.add_parser("validator"); validator.add_argument("--session-dir", required=True); validator.add_argument("--validator-id", required=True); validator.add_argument("--criterion-id", action="append", default=[]); validator.add_argument("command", nargs=argparse.REMAINDER); validator.set_defaults(func=cmd_validator)
+    decide = sub.add_parser("decide", help="Emit a planning-policy record (planning, context/verification depth, delegation, reason codes) from --signals JSON")
+    decide.add_argument("--signals", default="", help="JSON object of policy signals, e.g. '{\"dependent_files\": true, \"files\": 3}'")
+    decide.set_defaults(func=cmd_decide)
     bench = sub.add_parser("bench", help="GravitasBench reproducibility CLI (doctor, build-corpus, pilot, run, report)")
     bench.add_argument("bench_args", nargs=argparse.REMAINDER)
     bench.set_defaults(func=cmd_bench)

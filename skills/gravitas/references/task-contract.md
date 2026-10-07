@@ -34,16 +34,29 @@ Use a task contract when:
 |------|:------:|----------|
 | answer | None | Pure question answering |
 | research | None | Codebase exploration only |
-| plan-only | None | Planning/design work, no implementation |
-| review-only | None | Code review, no changes |
+| plan | None | Planning/design work, no implementation |
+| review | None | Code review, no changes |
 | debug | Limited | Diagnosis + targeted fix |
 | implement | Scoped | Standard feature/fix work |
 | migration | Confirmed | Schema/data migrations (destructive risk) |
 | security-review | None | Security audit only |
 
+Legacy contracts may use `plan-only` / `review-only`; the runtime accepts
+them as aliases of `plan` / `review`. New contracts should use the
+canonical names.
+
 ## Action Lock
 
-In read-only modes (answer, research, plan-only, review-only, security-review), the Antigravity plugin blocks write tool calls at hook level before they reach the model. Prompt compliance is not relied upon.
+In read-only modes (answer, research, plan, review, security-review), the runtime blocks writes and non-query shell execution at hook level before they reach the model. Prompt compliance is not relied upon.
+
+## Policy Dimensions
+
+Beyond `risk` / `budget`, contracts may declare explicit policy dimensions
+(see `schemas/contract.json`: `action_risk`, `reversibility`,
+`uncertainty`, `blast_radius`, `verification_depth`, `reason_codes`).
+Absent dimensions are treated as unknown, never as safe. The planning
+policy (`gravitas decide`) consumes these plus task signals and emits a
+machine-readable planning record.
 
 ## Acceptance Criteria
 

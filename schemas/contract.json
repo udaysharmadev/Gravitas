@@ -4,7 +4,7 @@
   "type": "object",
   "properties": {
     "task_id": { "type": "string" },
-    "mode": { "type": "string", "enum": ["implement", "plan", "debug", "review"] },
+    "mode": { "type": "string", "enum": ["implement", "plan", "review", "research", "answer", "debug", "security-review", "migration", "plan-only", "review-only"] },
     "objective": { "type": "string" },
     "acceptance_criteria": {
       "type": "array",
@@ -19,6 +19,18 @@
     },
     "non_goals": { "type": "array", "items": { "type": "string" } },
     "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "policy": {
+      "type": "object",
+      "description": "Explicit policy dimensions replacing the single risk_level scalar. All optional; absent dimensions are treated as unknown, never as safe.",
+      "properties": {
+        "action_risk": { "type": "string", "enum": ["read-only", "scoped-write", "mutation", "destructive"] },
+        "reversibility": { "type": "string", "enum": ["trivial", "revertible", "hard", "irreversible"] },
+        "uncertainty": { "type": "string", "enum": ["low", "medium", "high"] },
+        "blast_radius": { "type": "string", "enum": ["target", "dependency", "subsystem", "platform"] },
+        "verification_depth": { "type": "string", "enum": ["targeted", "impact", "full"] },
+        "reason_codes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
     "budget_profile": { "type": "string", "enum": ["eco", "balanced", "deep", "team"] },
     "allowed_write_scope": { "type": "array", "items": { "type": "string" } },
     "forbidden_scope": { "type": "array", "items": { "type": "string" } },
