@@ -23,7 +23,7 @@ class PackagingTests(unittest.TestCase):
         ]
         shipped = set()
         for pattern in patterns:
-            shipped.update(str(path.relative_to(ROOT)) for path in ROOT.glob(pattern))
+            shipped.update(path.relative_to(ROOT).as_posix() for path in ROOT.glob(pattern))
         for asset in [
             "plugins/gravitas-antigravity/plugin.json",
             "plugins/gravitas-antigravity/hooks.json",

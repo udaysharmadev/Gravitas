@@ -163,7 +163,12 @@ class EscapeTests(unittest.TestCase):
             base = Path(tmp)
             (base / "work").mkdir()
             (base / "outside.txt").write_text("x")
-            os.symlink(str(base / "outside.txt"), str(base / "work" / "evil"))
+            try:
+                os.symlink(str(base / "outside.txt"), str(base / "work" / "evil"))
+            except OSError as error:
+                if os.name == "nt" and getattr(error, "winerror", None) == 1314:
+                    self.skipTest("symlink creation requires Windows developer mode or privilege")
+                raise
             self.assertFalse(target_in_scope("work/evil", ["work"], [base]))
 
     def test_legitimate_nested_path_allowed(self):
@@ -175,19 +180,25 @@ class EscapeTests(unittest.TestCase):
 class ConfineTests(unittest.TestCase):
     def test_cwd_escape_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            os.chdir(tmp)
-            self.addCleanup(os.chdir, str(ROOT))
-            for bad in ("..", "../..", "/etc", "/tmp"):
-                with self.subTest(cwd=bad):
-                    self.assertRaises(ValueError, confine_cwd, bad)
+            original = os.getcwd()
+            try:
+                os.chdir(tmp)
+                for bad in ("..", "../..", "/etc", "/tmp"):
+                    with self.subTest(cwd=bad):
+                        self.assertRaises(ValueError, confine_cwd, bad)
+            finally:
+                os.chdir(original)
 
     def test_subdir_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:
             sub = Path(tmp) / "pkg"
             sub.mkdir()
-            os.chdir(tmp)
-            self.addCleanup(os.chdir, str(ROOT))
-            self.assertEqual(confine_cwd("pkg"), sub.resolve())
+            original = os.getcwd()
+            try:
+                os.chdir(tmp)
+                self.assertEqual(confine_cwd("pkg"), sub.resolve())
+            finally:
+                os.chdir(original)
 
     def test_runner_rejects_escaping_cwd(self):
         with tempfile.TemporaryDirectory() as tmp:

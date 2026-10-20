@@ -18,9 +18,13 @@ from gravitas_verify import discover_validators, escalation_plan, expand_cases
 
 
 def make_bin(tmp: Path, name: str) -> None:
-    path = tmp / name
-    path.write_text("#!/bin/sh\nexit 0\n")
-    path.chmod(path.stat().st_mode | stat.S_IEXEC)
+    if os.name == "nt":
+        path = tmp / f"{name}.cmd"
+        path.write_text("@echo off\r\nexit /b 0\r\n")
+    else:
+        path = tmp / name
+        path.write_text("#!/bin/sh\nexit 0\n")
+        path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
 class DiscoveryTests(unittest.TestCase):

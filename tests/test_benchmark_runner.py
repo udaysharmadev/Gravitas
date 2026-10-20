@@ -109,7 +109,7 @@ class BenchmarkRunnerTests(unittest.TestCase):
             self.assertFalse(any("assertEqual" in path.read_text()
                                  for path in (root / "tests").glob("*.py")))
             smoke = subprocess.run(
-                ["python3", "-m", "unittest", "discover", "-s", "tests", "-v"],
+                [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"],
                 cwd=root, capture_output=True, text=True, check=False,
             )
             self.assertEqual(smoke.returncode, 0)

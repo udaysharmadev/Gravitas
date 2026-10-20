@@ -95,7 +95,7 @@ class SkillReferenceTests(unittest.TestCase):
         self.assertTrue(refs, "SKILL.md should link task references")
         pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
         patterns = [p for g in pyproject["tool"]["setuptools"]["data-files"].values() for p in g]
-        shipped = {str(p.relative_to(ROOT)) for pat in patterns for p in ROOT.glob(pat)}
+        shipped = {p.relative_to(ROOT).as_posix() for pat in patterns for p in ROOT.glob(pat)}
         for ref in refs:
             self.assertTrue((ROOT / "skills/gravitas" / ref).is_file(), ref)
             self.assertIn(f"skills/gravitas/{ref}", shipped, f"wheel omits {ref}")
