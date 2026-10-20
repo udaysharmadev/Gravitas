@@ -23,7 +23,7 @@ except ModuleNotFoundError:
 # project-declared validators. Never preferred over discovered commands.
 FALLBACK_CHAINS = {
     "typescript": "npx tsc --noEmit",
-    "python": "python3 -m pytest -q",
+    "python": f'"{sys.executable}" -m pytest -q',
     "rust": "cargo test",
     "go": "go test ./...",
 }
