@@ -36,7 +36,7 @@ jobs:
         run: python benchmarks/runner/validate.py --episodes benchmarks/results --allow-empty
 
       - name: Compile native hook scripts
-        run: python -m py_compile gravitas_cli.py gravitas_init.py plugins/gravitas-antigravity/scripts/*.py skills/gravitas/scripts/*.py benchmarks/runner/*.py
+        run: python -m py_compile gravitas_cli.py gravitas_init.py scripts/bundle_manifest.py plugins/gravitas-antigravity/scripts/*.py skills/gravitas/scripts/*.py benchmarks/runner/*.py
 
       - name: Smoke-test installed CLI
         run: gravitas doctor

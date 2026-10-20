@@ -1,0 +1,5 @@
+# The bundle manifest is generated with LF bytes and its digests are computed
+# over LF-normalized content, so its worktree copy must stay LF everywhere.
+# Without this rule core.autocrlf=true rewrites it to CRLF on checkout, which
+# both warns on every add and leaves the file churning after each build.
+dist/gravitas-antigravity/SHA256SUMS text eol=lf
