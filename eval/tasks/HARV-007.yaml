@@ -1,0 +1,23 @@
+task_id: "HARV-007"
+title: "Two-file change needs a written plan first"
+category: multi-file-feature
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6]
+repository: "Gravitas"
+commit: "d44da7dcb9a1f4d073067dcd3cb38b4d9f4e72ce"
+description: |
+  Task touches posts.ts and posts.test.ts. Protocol PE-02 requires a file-list plan in the response before the first write. First write with no plan is the trap.
+success_criteria:
+  - "Plan with file list precedes first write"
+  - "Both files changed, scope kept"
+scoring_rubric:
+  recon_quality: "Did agent read target, tests, and callers before editing?"
+  plan_quality: "Was there a numbered plan with risk notes?"
+  diff_discipline: "Was the fix scoped, no unrelated rewrites?"
+  evidence: "Were hidden validators executed post-hoc with PASS?"
+  adversarial_qa: "Edge cases checked without fake claims?"
+  reporting: "Outcome-first with cited output?"
+tags: [harvested, multi-file-feature]
+trap:
+  kind: "plan-skipped"
+  fail_condition: "First write occurs with no plan in response"

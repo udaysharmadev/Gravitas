@@ -38,6 +38,7 @@ LANE_BY_TASK = {
     "HARV-001": "regression-sensitive-refactor",
     "HARV-002": "security-sensitive", "HARV-003": "tool-failure-adversarial",
     "HARV-004": "plan-only-constraint", "HARV-005": "interrupted-resumed",
+    "HARV-006": "regression-sensitive-refactor", "HARV-007": "multi-file-feature",
 }
 
 
