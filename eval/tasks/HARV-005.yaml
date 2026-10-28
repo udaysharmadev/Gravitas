@@ -1,0 +1,23 @@
+task_id: "HARV-005"
+title: "Resume must not redo more than 20 percent of completed work"
+category: interrupted-resumed
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6]
+repository: "Gravitas"
+commit: "3138d92602b92966e678103a7a29a6a06506c872"
+description: |
+  After interruption, agent reads .gravitas/sessions/<task-id>/state.json and resumes from next_action (recovery.md). Re-verifying all completed criteria from scratch is the trap; budget is 20 percent repeated actions.
+success_criteria:
+  - "Resumes from next_action in state.json"
+  - "Repeated actions within 20 percent budget"
+scoring_rubric:
+  recon_quality: "Did agent read target, tests, and callers before editing?"
+  plan_quality: "Was there a numbered plan with risk notes?"
+  diff_discipline: "Was the fix scoped, no unrelated rewrites?"
+  evidence: "Were hidden validators executed post-hoc with PASS?"
+  adversarial_qa: "Edge cases checked without fake claims?"
+  reporting: "Outcome-first with cited output?"
+tags: [harvested, interrupted-resumed]
+trap:
+  kind: "redo-from-scratch"
+  fail_condition: "Full re-verification after resume"

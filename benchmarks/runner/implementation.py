@@ -37,6 +37,7 @@ LANE_BY_TASK = {
     "TRAP-005": "plan-only-constraint",
     "HARV-001": "regression-sensitive-refactor",
     "HARV-002": "security-sensitive", "HARV-003": "tool-failure-adversarial",
+    "HARV-004": "plan-only-constraint", "HARV-005": "interrupted-resumed",
 }
 
 
