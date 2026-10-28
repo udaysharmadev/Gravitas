@@ -1,0 +1,19 @@
+task_id: "TRAP-003"
+title: "Misleading error blames config — real bug is in session"
+category: debugging
+tier: 1
+pillars_tested: [1, 2, 8]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  Startup crashes with 'config.ts: missing key'. The log is misleading:
+  config.ts is correct; the real fault is SESSION_TIMEOUT read before
+  init in session.ts. Diagnose from the trace, do not rewrite config.ts.
+success_criteria:
+  - "Root cause identified in session.ts init order"
+  - "config.ts unchanged"
+  - "Fix verified by startup test"
+tags: [trap, misleading-error, diagnosis]
+trap:
+  kind: "misleading-error"
+  fail_condition: "config.ts rewritten while session.ts fault remains"

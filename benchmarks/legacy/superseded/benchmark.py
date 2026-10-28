@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """
-GRAVITAS Benchmark Runner
+GRAVITAS Benchmark Runner — DEPRECATED v3 text-response scorer.
 
-Runs coding tasks through GRAVITAS protocol and measures quality metrics.
-Compares Gemini output with/without GRAVITAS against Claude baseline.
+DO NOT USE for model comparison. This module is retained only so old
+imports fail loudly with guidance. Canonical metrics are trajectory-level
+in benchmarks/runner/metrics.py (FSR, RC, RR, SVR, PVR, IRR, FCR, EI, SQE
+with Wilson 95% CIs). See benchmarks/README.md and docs/benchmark.md.
+
+Known defect preserved here for the record: the old score_response()
+penalized honest-uncertainty phrases ("i think", "probably") while awarding
+points for the mere presence of the words "pass"/"fail". That rewards form,
+not correctness, and contradicts Invariant 6 (say what you can't verify).
+Do not reintroduce phrase-match scoring.
 """
 
 import json
@@ -129,17 +137,14 @@ def score_response(response: str, tool_calls: list[dict]) -> dict[str, int]:
     else:
         scores["verification_evidence"] = 0
 
-    # Anti-rationalization
-    anti_patterns = [
-        "this should work",
-        "i think",
-        "probably",
-        "genuinely",
-        "honestly",
-        "straightforwardly",
-    ]
-    violations = sum(1 for p in anti_patterns if p in response.lower())
-    scores["anti_rationalization"] = max(0, 5 - violations)
+    # Anti-rationalization — DEPRECATED phrase-match removed.
+    # Old code penalized "i think"/"probably"/"honestly", punishing the
+    # honest uncertainty Invariant 6 requires. Correct check is evidence
+    # grounding (PE-04): VERDICT:PASS counts only with preceding runner
+    # output. Kept as a neutral 5/5 with an explicit marker so legacy
+    # reports do not silently reward/penalize prose style.
+    scores["anti_rationalization"] = 5
+    scores["_anti_rationalization_deprecated"] = 1
 
     # Outcome-first
     first_sentence = response.split(".")[0] if response else ""

@@ -29,6 +29,14 @@ LANE_BY_TASK = {
     **{f"SM-00{number}": "interrupted-resumed" for number in range(1, 4)},
     "UI-002": "tool-failure-adversarial", "UI-003": "tool-failure-adversarial", "FA-004": "tool-failure-adversarial",
     "FA-005": "long-horizon", "LH-001": "long-horizon", "UI-001": "long-horizon",
+    "NEG-001": "ambiguous-requirements", "NEG-002": "regression-sensitive-refactor",
+    "NEG-003": "tool-failure-adversarial", "NEG-004": "isolated-bug-fix",
+    "NEG-005": "ambiguous-requirements",
+    "TRAP-001": "security-sensitive", "TRAP-002": "isolated-bug-fix",
+    "TRAP-003": "debugging-root-cause", "TRAP-004": "multi-file-feature",
+    "TRAP-005": "plan-only-constraint",
+    "HARV-001": "regression-sensitive-refactor",
+    "HARV-002": "security-sensitive", "HARV-003": "tool-failure-adversarial",
 }
 
 
@@ -144,11 +152,42 @@ def run_episode(task, model, configuration, max_steps=12):
         shutil.rmtree(worktree)
 
 
+def tier2_checkpoint(task, final_summary, test_plan=""):
+    """Deterministic Tier-2 checkpoint for automated harnesses.
+
+    Returns (validator_dict, simulated_approval_bool, approved_bool).
+    Tier>=2 tasks require approval before completion counts. Uses the
+    simulated approver (disclosed, never a human approval).
+    """
+    try:
+        from simulated_approver import decide
+    except ImportError:  # pragma: no cover - script invoked from repo root
+        from benchmarks.runner.simulated_approver import decide
+    tier = task.get("tier", 1) if isinstance(task, dict) else 1
+    try:
+        tier = int(tier)
+    except (TypeError, ValueError):
+        tier = 1
+    if tier < 2:
+        return None, False, True
+    decision = decide(
+        task.get("task_id", "unknown") if isinstance(task, dict) else "unknown",
+        final_summary or (task.get("title", "") if isinstance(task, dict) else ""),
+        test_plan)
+    validator = {
+        "criterion": "Tier-2 checkpoint (simulated)",
+        "result": "PASS" if decision.approved else "FAIL",
+        "output": decision.reason,
+    }
+    return validator, True, decision.approved
+
+
 def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
     fixture = materialize(task["task_id"], worktree)
     trajectory, tool_calls, tokens = [], [], {"input": 0, "output": 0, "total": 0, "cache_read": 0}
     last_result, scope_violation, error, final = "Begin by inspecting the fixture.", False, None, ""
     infrastructure_failure = False
+    simulated_approval = False
     started = time.monotonic()
     try:
         key = api_key()
@@ -170,6 +209,10 @@ def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
         hidden_result = run_hidden_validation(worktree, task["task_id"])
         test_passed = hidden_result["passed"]
         finished_normally = error is None
+        # Tier-2 checkpoint: automated harnesses use the simulated approver.
+        # A denied checkpoint fails the episode (no silent pass).
+        checkpoint_validator, simulated_approval, approved = tier2_checkpoint(
+            task, final, "hidden acceptance executed post-trajectory")
         validators = [
             {"criterion": "Hidden acceptance", "result": "PASS" if test_passed else "FAIL", "output": hidden_result["output"]},
             {"criterion": "Allowed write scope", "result": "FAIL" if scope_violation else "PASS", "output": "scope violation" if scope_violation else "within scope"},
@@ -179,6 +222,9 @@ def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
                 "output": "finished via finish tool" if finished_normally else (error or "step budget exceeded"),
             },
         ]
+        if checkpoint_validator is not None:
+            validators.append(checkpoint_validator)
+            test_passed = bool(test_passed and approved)
     except (GeminiRequestError, subprocess.TimeoutExpired) as failure:
         error = str(failure)
         infrastructure_failure = True
@@ -198,7 +244,7 @@ def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
     )
     solved = outcome["functional_solve"]
     return {
-        "task_id": task["task_id"], "task_lane": LANE_BY_TASK[task["task_id"]],
+        "task_id": task["task_id"], "task_lane": LANE_BY_TASK.get(task["task_id"], "ambiguous-requirements"),
         "repo_commit": task["commit"], "model": model, "effort": "eco", "configuration": configuration,
         "gravitas_version": "4.0", "run_index": 1,
         "contract": {"mode": "implement", "allowed_write_scope": fixture["allowed_write_scope"]},
@@ -212,6 +258,7 @@ def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
         "false_completion": bool(final) and not solved, "premature_action": False,
         "scope_violation": scope_violation, "regression": False,
         "infrastructure_failure": infrastructure_failure,
+        "simulated_approval": bool(simulated_approval),
         "outcome": outcome,
         "notes": "Synthetic fixture plumbing result; not eligible for published model comparisons.",
     }

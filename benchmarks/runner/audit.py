@@ -35,6 +35,77 @@ def audit():
     intended, unintended = triggers.get("intended_activations", []), triggers.get("non_activations", [])
     if not intended or not unintended or not all(item.get("expect") is True for item in intended) or not all(item.get("expect") is False for item in unintended):
         errors.append("trigger evaluation must contain intended and non-activation cases with explicit expectations")
+    # Hard-negative gate: near-miss read-only questions must be present,
+    # otherwise false-positive rate is meaningless.
+    if len(unintended) < 10:
+        errors.append(f"trigger evaluation needs >=10 non-activation cases (near-miss included), found {len(unintended)}")
+    unintended_text = " ".join(item.get("input", "").lower() for item in unintended)
+    if "regex" not in unintended_text and "summarize" not in unintended_text and "stack trace" not in unintended_text:
+        errors.append("trigger evaluation must include near-miss read-only cases (explain/summarize, no mutation)")
+    # Tier-eval gate: classification accuracy needs a labeled set.
+    tier_path = ROOT / "eval/tier-eval.json"
+    if not tier_path.is_file():
+        errors.append("eval/tier-eval.json is missing")
+    else:
+        try:
+            tier_cases = json.loads(tier_path.read_text()).get("cases", [])
+        except (OSError, ValueError) as error:
+            errors.append(f"eval/tier-eval.json unreadable: {error}")
+            tier_cases = []
+        if len(tier_cases) < 30:
+            errors.append(f"eval/tier-eval.json needs >=30 labeled cases, found {len(tier_cases)}")
+    # Negative-task gate: each NEG task must declare its trap.
+    for neg in ("NEG-001", "NEG-002", "NEG-003", "NEG-004", "NEG-005"):
+        neg_path = ROOT / "eval/tasks" / f"{neg}.yaml"
+        if not neg_path.is_file():
+            errors.append(f"eval/tasks/{neg}.yaml is missing")
+        elif "fail_condition" not in neg_path.read_text():
+            errors.append(f"eval/tasks/{neg}.yaml must declare trap.fail_condition")
+    # Trap-task gate: partial-fix / stale-assert / misleading-error coverage.
+    for trap in ("TRAP-001", "TRAP-002", "TRAP-003", "TRAP-004", "TRAP-005"):
+        trap_path = ROOT / "eval/tasks" / f"{trap}.yaml"
+        if not trap_path.is_file():
+            errors.append(f"eval/tasks/{trap}.yaml is missing")
+        elif "fail_condition" not in trap_path.read_text():
+            errors.append(f"eval/tasks/{trap}.yaml must declare trap.fail_condition")
+    # Harvested-task gate: every HARV-* task needs a trap + solver-blind validator.
+    harv_tasks = sorted((ROOT / "eval/tasks").glob("HARV-*.yaml"))
+    if not harv_tasks:
+        errors.append("no harvested tasks found (eval/tasks/HARV-*.yaml)")
+    for harv_path in harv_tasks:
+        if "fail_condition" not in harv_path.read_text():
+            errors.append(f"{harv_path.name} must declare trap.fail_condition")
+        validator_path = ROOT / "benchmarks/validators" / (harv_path.stem + ".json")
+        if not validator_path.is_file():
+            errors.append(f"benchmarks/validators/{harv_path.stem}.json is missing (solver-blind hash)")
+            continue
+        try:
+            meta = json.loads(validator_path.read_text())
+        except (OSError, ValueError) as error:
+            errors.append(f"benchmarks/validators/{harv_path.stem}.json unreadable: {error}")
+            continue
+        if "hidden_validator_hash" not in meta:
+            errors.append(f"benchmarks/validators/{harv_path.stem}.json must contain hidden_validator_hash")
+        raw_validator = validator_path.read_text()
+        if "assertEqual" in raw_validator or "def test_" in raw_validator:
+            errors.append(f"benchmarks/validators/{harv_path.stem}.json must not embed test source")
+    # Fix-cycle + judge-calibration gates.
+    fix_path = ROOT / "eval/fix-cycle-eval.json"
+    if not fix_path.is_file():
+        errors.append("eval/fix-cycle-eval.json is missing")
+    samples_path = ROOT / "eval/judge-calibration/samples.jsonl"
+    if not samples_path.is_file():
+        errors.append("eval/judge-calibration/samples.jsonl is missing")
+    else:
+        lines = [line for line in samples_path.read_text().splitlines() if line.strip()]
+        if len(lines) < 20:
+            errors.append(f"judge-calibration needs >=20 hand-labeled samples, found {len(lines)}")
+    # Harness infra gates.
+    for relative in ("benchmarks/runner/harvest.py", "benchmarks/runner/simulated_approver.py",
+                     "benchmarks/runner/trigger_eval.py", "benchmarks/runner/implementation.py",
+                     "benchmarks/TRACKER.md", "eval/judge_calibration.py"):
+        if not (ROOT / relative).is_file():
+            errors.append(f"{relative} is missing")
 
     native_plugin_root = ROOT / "plugins/gravitas-antigravity"
     plugin = json.loads((native_plugin_root / "plugin.json").read_text())

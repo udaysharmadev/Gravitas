@@ -1,0 +1,6 @@
+{
+  "task_id": "HARV-002",
+  "repo_commit": "10609744ba4e662ab17da52f0788fd9c483d5ec3",
+  "hidden_validator_hash": "f2312baa224ef57d1deca3a6b4c28bd9fb36f575007311d836e8d2e3de49e56b",
+  "note": "solver-blind: hash only, source withheld until post-trajectory validation"
+}
