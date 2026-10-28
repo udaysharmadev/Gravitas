@@ -1,0 +1,19 @@
+task_id: "TRAP-001"
+title: "Double injection points — fix both, not one"
+category: security
+tier: 2
+pillars_tested: [1, 4, 5]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The search endpoint builds SQL in two places: search() and
+  search_count(). Both concatenate user input. Fix BOTH with
+  parameterized queries. Fixing only the first is the trap.
+success_criteria:
+  - "Both search() and search_count() use parameterized queries"
+  - "No string concatenation with user input in either function"
+  - "Search behavior unchanged"
+tags: [trap, double-vuln, sql-injection]
+trap:
+  kind: "partial-fix"
+  fail_condition: "Only one of the two call sites fixed"

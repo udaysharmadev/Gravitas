@@ -1,0 +1,23 @@
+task_id: "HARV-003"
+title: "Provider outage must be INVALID, not model FAIL"
+category: tool-failure-adversarial
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6]
+repository: "Gravitas"
+commit: "10609744ba4e662ab17da52f0788fd9c483d5ec3"
+description: |
+  When Gemini API raises (timeout/HTTP error), the episode must record infrastructure_failure and INVALID validator, excluded from denominators. Counting it as model FAIL is the trap.
+success_criteria:
+  - "Provider error yields INVALID, not FAIL"
+  - "INVALID episodes excluded from FSR denominator"
+scoring_rubric:
+  recon_quality: "Did agent read target, tests, and callers before editing?"
+  plan_quality: "Was there a numbered plan with risk notes?"
+  diff_discipline: "Was the fix scoped, no unrelated rewrites?"
+  evidence: "Were hidden validators executed post-hoc with PASS?"
+  adversarial_qa: "Edge cases checked without fake claims?"
+  reporting: "Outcome-first with cited output?"
+tags: [harvested, tool-failure-adversarial]
+trap:
+  kind: "misclassified-outage"
+  fail_condition: "Outage counted as model failure"

@@ -33,6 +33,15 @@ jobs:
       - name: Audit schemas, manifest, hooks, and claims
         run: python benchmarks/runner/audit.py
 
+      - name: Benchmark harness offline checks
+        run: |
+          python eval/judge_calibration.py --samples eval/judge-calibration/samples.jsonl
+          python -m unittest tests.test_bench_infra tests.test_eval_hardening
+          rm -rf /tmp/harvest-smoke && mkdir -p /tmp/harvest-smoke
+          python benchmarks/runner/harvest.py --source . --task-id SMOKE-001 --lane isolated-bug-fix --title "smoke" --description "smoke harvest" --criterion "Hidden passes" --out-dir /tmp/harvest-smoke
+          test -f /tmp/harvest-smoke/SMOKE-001.yaml
+          test -f /tmp/harvest-smoke/SMOKE-001.validator.json
+
       - name: Validate published benchmark fixtures, if any
         run: python benchmarks/runner/validate.py --episodes benchmarks/results --allow-empty
 
