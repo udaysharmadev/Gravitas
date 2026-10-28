@@ -6,7 +6,7 @@ meta:
   version: "1.0"
   status: "registry-only"
   last_updated: "2026-10-28"
-  task_count: 47
+  task_count: 48
   target_task_count: 50
   runs_per_config: 5
 
@@ -15,7 +15,7 @@ lanes:
     name: isolated-bug-fix
     description: Single-file bug fix with clear root cause
     target_count: 3
-    tasks: [BF-001, BF-002, BF-003, NEG-004, TRAP-002]
+    tasks: [BF-001, BF-002, BF-003, NEG-004, TRAP-002, HARV-008]
 
   L2:
     name: multi-file-feature

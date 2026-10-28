@@ -94,6 +94,23 @@ class ApproverTests(unittest.TestCase):
                 src, "X-001", "isolated-bug-fix", "T", "d", ["c"], "k", "f")
             self.assertIn('repository: "myrepo"', yaml_text)
 
+    def test_harvest_accepts_lowercase_license(self):
+        harvest = _load("harvest3", ROOT / "benchmarks/runner/harvest.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "realrepo"
+            src.mkdir()
+            subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+            subprocess.run(["git", "config", "user.email", "t@t"], cwd=src, check=True)
+            subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+            (src / "license").write_text("MIT\n")
+            (src / "a.py").write_text("x=1\n")
+            subprocess.run(["git", "add", "."], cwd=src, check=True)
+            subprocess.run(["git", "commit", "-qm", "init"], cwd=src, check=True)
+            yaml_text, meta = harvest.harvest(
+                src, "X-002", "isolated-bug-fix", "T", "d", ["c"], "k", "f")
+            self.assertIn("X-002", yaml_text)
+            self.assertIn("hidden_validator_hash", meta)
+
 
 class HarvestedTaskTests(unittest.TestCase):
     def test_harv_tasks_and_validators_present(self):
