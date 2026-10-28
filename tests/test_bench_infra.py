@@ -185,5 +185,30 @@ class TriggerEvalRunnerTests(unittest.TestCase):
         self.assertEqual(result["false_positive_rate"]["rate"], 0.0)
 
 
+class TierEvalRunnerTests(unittest.TestCase):
+    def test_tier_accuracy_and_deep_slices(self):
+        mod = _load("tiereval", ROOT / "benchmarks/runner/tier_eval.py")
+        cases = mod.load_cases()
+        self.assertGreaterEqual(len(cases), 30)
+        perfect = {c["id"]: c["expect"] for c in cases}
+        result = mod.evaluate(perfect)
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["accuracy"], 1.0)
+        self.assertEqual(result["single_file_auth_deep"]["accuracy"], 1.0)
+        self.assertEqual(result["uncertain_deep"]["accuracy"], 1.0)
+
+    def test_file_count_heuristic_fails_auth_slice(self):
+        # A naive file-count rule (single file -> direct) must fail the
+        # single-file-auth slice, proving the slice has teeth.
+        mod = _load("tiereval2", ROOT / "benchmarks/runner/tier_eval.py")
+        cases = mod.load_cases()
+        def norm(text):
+            return text.lower().replace("-", " ")
+        naive = {c["id"]: ("direct" if "single file" in norm(c["task"]) else c["expect"]) for c in cases}
+        result = mod.evaluate(naive)
+        self.assertFalse(result["passed"])
+        self.assertLess(result["single_file_auth_deep"]["accuracy"], 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

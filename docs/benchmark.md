@@ -25,7 +25,7 @@ INVALID and excluded from denominators.
 
 ## Current status
 
-Registry: 30 task specs across 10 lanes. Fixtures are synthetic and
+Registry: 47 task specs across 10 lanes (30 core + 5 negative + 5 trap + 7 harvested). Fixtures are synthetic and
 disposable (plumbing only, ineligible for publication). No release-grade
 pinned repositories, no multi-family runs, no published results. See
 `docs/production-readiness.md` for the gate board.

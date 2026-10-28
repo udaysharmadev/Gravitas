@@ -102,7 +102,8 @@ def audit():
             errors.append(f"judge-calibration needs >=20 hand-labeled samples, found {len(lines)}")
     # Harness infra gates.
     for relative in ("benchmarks/runner/harvest.py", "benchmarks/runner/simulated_approver.py",
-                     "benchmarks/runner/trigger_eval.py", "benchmarks/runner/implementation.py",
+                     "benchmarks/runner/trigger_eval.py", "benchmarks/runner/tier_eval.py",
+                     "benchmarks/runner/implementation.py",
                      "benchmarks/TRACKER.md", "eval/judge_calibration.py"):
         if not (ROOT / relative).is_file():
             errors.append(f"{relative} is missing")
