@@ -241,14 +241,15 @@ class BenchmarkRunnerTests(unittest.TestCase):
         self.assertEqual(episode["validator_outputs"][0]["result"], "INVALID")
         self.assertNotIn("AQ.", json.dumps(episode))
 
-    def test_manifest_registers_thirty_unique_task_specs(self):
+    def test_manifest_registers_unique_task_specs(self):
         manifest = (ROOT / "benchmarks/manifest.yaml").read_text()
         lanes = re.findall(r"^  L\d+:.*?^    tasks: \[([^]]*)\]", manifest, re.MULTILINE | re.DOTALL)
         task_ids = [task_id.strip() for lane in lanes for task_id in lane.split(",") if task_id.strip()]
         specs = {path.stem for path in (ROOT / "eval/tasks").glob("*.yaml")}
+        expected = int(re.search(r"^  task_count: (\d+)", manifest, re.MULTILINE).group(1))
         self.assertEqual(len(lanes), 10)
-        self.assertEqual(len(task_ids), 30)
-        self.assertEqual(len(set(task_ids)), 30)
+        self.assertEqual(len(task_ids), expected)
+        self.assertEqual(len(set(task_ids)), expected)
         self.assertFalse(set(task_ids) - specs)
 
     def test_fixture_withholds_acceptance_and_starts_failing(self):
@@ -392,7 +393,11 @@ class BenchmarkRunnerTests(unittest.TestCase):
                  "--out", str(Path(directory) / "corpus")],
                 text=True, capture_output=True, cwd=ROOT, check=False)
             self.assertEqual(build.returncode, 0, build.stderr)
-            self.assertEqual(json.loads(build.stdout)["built"], 30)
+            import yaml
+            expected = len([t for lane in yaml.safe_load(
+                (ROOT / "benchmarks/manifest.yaml").read_text())["lanes"].values()
+                for t in lane.get("tasks", [])])
+            self.assertEqual(json.loads(build.stdout)["built"], expected)
 
     def test_hidden_test_deterministic_per_task(self):
         self.assertEqual(fixtures.hidden_test_source("BF-001"),

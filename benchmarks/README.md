@@ -124,7 +124,7 @@ No release-eligible episodes are published in `benchmarks/results/`. Local
 aggregate canary artifacts may exist while developing the runner, but they are
 ignored, are not episode files, and are not model-comparison evidence.
 
-The manifest now registers 30 task specifications. The implementation adapter
+The manifest now registers 48 task specifications (30 core + 5 negative + 5 trap + 8 harvested across the same 10 lanes; holdout unchanged). The implementation adapter
 materializes a disposable, intentionally failing synthetic fixture for each
 registered task. Its model is restricted to reading files, replacing one
 allowlisted source file, running one fixed test command, and finishing; every

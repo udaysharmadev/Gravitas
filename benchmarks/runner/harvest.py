@@ -36,6 +36,10 @@ def check_license(source: Path) -> Path:
         candidate = source / name
         if candidate.is_file():
             return candidate
+    # Real OSS often uses lowercase (e.g. sindresorhus `license`); match case-insensitively.
+    for entry in source.iterdir():
+        if entry.is_file() and entry.name.lower() in ("license", "license.md", "license.txt", "copying"):
+            return entry
     raise RuntimeError(f"source has no LICENSE file: {source}")
 
 

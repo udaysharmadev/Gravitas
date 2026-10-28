@@ -94,6 +94,23 @@ class ApproverTests(unittest.TestCase):
                 src, "X-001", "isolated-bug-fix", "T", "d", ["c"], "k", "f")
             self.assertIn('repository: "myrepo"', yaml_text)
 
+    def test_harvest_accepts_lowercase_license(self):
+        harvest = _load("harvest3", ROOT / "benchmarks/runner/harvest.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "realrepo"
+            src.mkdir()
+            subprocess.run(["git", "init", "-q"], cwd=src, check=True)
+            subprocess.run(["git", "config", "user.email", "t@t"], cwd=src, check=True)
+            subprocess.run(["git", "config", "user.name", "t"], cwd=src, check=True)
+            (src / "license").write_text("MIT\n")
+            (src / "a.py").write_text("x=1\n")
+            subprocess.run(["git", "add", "."], cwd=src, check=True)
+            subprocess.run(["git", "commit", "-qm", "init"], cwd=src, check=True)
+            yaml_text, meta = harvest.harvest(
+                src, "X-002", "isolated-bug-fix", "T", "d", ["c"], "k", "f")
+            self.assertIn("X-002", yaml_text)
+            self.assertIn("hidden_validator_hash", meta)
+
 
 class HarvestedTaskTests(unittest.TestCase):
     def test_harv_tasks_and_validators_present(self):
@@ -183,6 +200,31 @@ class TriggerEvalRunnerTests(unittest.TestCase):
         self.assertTrue(result["passed"])
         self.assertEqual(result["activation_rate"]["rate"], 1.0)
         self.assertEqual(result["false_positive_rate"]["rate"], 0.0)
+
+
+class TierEvalRunnerTests(unittest.TestCase):
+    def test_tier_accuracy_and_deep_slices(self):
+        mod = _load("tiereval", ROOT / "benchmarks/runner/tier_eval.py")
+        cases = mod.load_cases()
+        self.assertGreaterEqual(len(cases), 30)
+        perfect = {c["id"]: c["expect"] for c in cases}
+        result = mod.evaluate(perfect)
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["accuracy"], 1.0)
+        self.assertEqual(result["single_file_auth_deep"]["accuracy"], 1.0)
+        self.assertEqual(result["uncertain_deep"]["accuracy"], 1.0)
+
+    def test_file_count_heuristic_fails_auth_slice(self):
+        # A naive file-count rule (single file -> direct) must fail the
+        # single-file-auth slice, proving the slice has teeth.
+        mod = _load("tiereval2", ROOT / "benchmarks/runner/tier_eval.py")
+        cases = mod.load_cases()
+        def norm(text):
+            return text.lower().replace("-", " ")
+        naive = {c["id"]: ("direct" if "single file" in norm(c["task"]) else c["expect"]) for c in cases}
+        result = mod.evaluate(naive)
+        self.assertFalse(result["passed"])
+        self.assertLess(result["single_file_auth_deep"]["accuracy"], 1.0)
 
 
 if __name__ == "__main__":

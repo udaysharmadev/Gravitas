@@ -5,9 +5,9 @@
 meta:
   version: "1.0"
   status: "registry-only"
-  last_updated: "2026-09-11"
-  task_count: 30
-  target_task_count: 30
+  last_updated: "2026-10-28"
+  task_count: 48
+  target_task_count: 50
   runs_per_config: 5
 
 lanes:
@@ -15,55 +15,55 @@ lanes:
     name: isolated-bug-fix
     description: Single-file bug fix with clear root cause
     target_count: 3
-    tasks: [BF-001, BF-002, BF-003]
+    tasks: [BF-001, BF-002, BF-003, NEG-004, TRAP-002, HARV-008]
 
   L2:
     name: multi-file-feature
     description: Feature implementation touching 2+ files with clear acceptance criteria
     target_count: 3
-    tasks: [FA-001, FA-002, FA-003]
+    tasks: [FA-001, FA-002, FA-003, TRAP-004, HARV-007]
 
   L3:
     name: debugging-root-cause
     description: Diagnosis of a failure with non-obvious root cause
     target_count: 3
-    tasks: [BF-004, BF-005, DB-001]
+    tasks: [BF-004, BF-005, DB-001, TRAP-003]
 
   L4:
     name: regression-sensitive-refactor
     description: Refactor with existing test suite that must not regress
     target_count: 3
-    tasks: [RF-001, RF-002, RF-003]
+    tasks: [RF-001, RF-002, RF-003, NEG-002, HARV-001, HARV-006]
 
   L5:
     name: security-sensitive
     description: Security-affecting change (SQL injection, auth, input validation)
     target_count: 3
-    tasks: [SC-001, SC-002, SC-003]
+    tasks: [SC-001, SC-002, SC-003, TRAP-001, HARV-002]
 
   L6:
     name: ambiguous-requirements
     description: Task with underspecified requirements requiring clarification or assumption
     target_count: 3
-    tasks: [AM-001, AM-002, AM-003]
+    tasks: [AM-001, AM-002, AM-003, NEG-001, NEG-005]
 
   L7:
     name: plan-only-constraint
     description: Explicit plan-only mode -- agent must not implement
     target_count: 3
-    tasks: [PL-001, PL-002, PL-003]
+    tasks: [PL-001, PL-002, PL-003, TRAP-005, HARV-004]
 
   L8:
     name: interrupted-resumed
     description: Task interrupted halfway, resumed in fresh context
     target_count: 3
-    tasks: [SM-001, SM-002, SM-003]
+    tasks: [SM-001, SM-002, SM-003, HARV-005]
 
   L9:
     name: tool-failure-adversarial
     description: Task where tools fail or return unexpected results
     target_count: 3
-    tasks: [UI-002, UI-003, FA-004]
+    tasks: [UI-002, UI-003, FA-004, NEG-003, HARV-003]
 
   L10:
     name: long-horizon
