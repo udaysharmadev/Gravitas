@@ -1,11 +1,16 @@
 """V5 hardening regressions: enforcement fail-closed, classifier, evidence, init, packaging."""
+import argparse
+import io
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).parents[1]
 SCRIPTS = ROOT / "plugins/gravitas-antigravity/scripts"
@@ -14,6 +19,14 @@ sys.path.insert(0, str(SCRIPTS))
 
 import test_runtime
 from gravitas_action import classify_shell
+from evidence_chain import (
+    append_evidence,
+    anchor_path,
+    backfill_anchors,
+    canonical_json,
+    sha256,
+    verify_with_anchor,
+)
 from gravitas_init import _copy_tree, init_opencode
 
 
@@ -209,6 +222,61 @@ class EvidenceV5Tests(unittest.TestCase):
         self.assertEqual(gate["decision"], "continue")
         self.assertIn("chain", gate["reason"])
 
+    def test_user_anchor_detects_rewritten_chain_and_truncation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / ".gravitas" / "sessions" / "task"
+            home = root / "private-home"
+            session.mkdir(parents=True)
+            with patch.dict(
+                os.environ, {"HOME": str(home), "USERPROFILE": str(home)}
+            ):
+                first = append_evidence(session, {"source": "read", "file": "a.py"})
+                second = append_evidence(session, {"source": "read", "file": "b.py"})
+                ledger = session / "evidence.jsonl"
+                original = ledger.read_text(encoding="utf-8")
+                self.assertEqual(verify_with_anchor(session), (True, "chain valid; ledger head anchored"))
+
+                forged = {
+                    "source": "validator", "timestamp": "2026-10-19T00:00:00+00:00",
+                    "previous_event_hash": None,
+                }
+                forged["event_hash"] = sha256(forged)
+                ledger.write_text(canonical_json(forged) + "\n", encoding="utf-8")
+                self.assertFalse(verify_with_anchor(session)[0])
+
+                ledger.write_text(original, encoding="utf-8")
+                anchors = anchor_path(session)
+                anchor_lines = anchors.read_text(encoding="utf-8").splitlines()
+                anchors.write_text(anchor_lines[0] + "\n", encoding="utf-8")
+                valid, reason = verify_with_anchor(session)
+                self.assertFalse(valid)
+                self.assertIn("not anchored", reason)
+                self.assertNotEqual(first["event_hash"], second["event_hash"])
+
+    def test_stop_gate_rejects_self_consistent_unanchored_rewrite(self):
+        command = [sys.executable, "-c", "pass"]
+        session = self.init({"mode": "implement", "objective": "x",
+                             "acceptance_criteria": [{"id": "AC1", "statement": "y"}],
+                             "validators": [{"id": "u", "command": command,
+                                             "criterion_ids": ["AC1"]}]})
+        run = test_runtime.run_script(
+            "validator_runner.py", None, "--session-dir", str(session),
+            "--validator-id", "u", "--criterion-id", "AC1",
+            "--", *command, cwd=self.cwd)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        forged = {
+            "source": "validator", "validator_id": "u", "criterion_ids": ["AC1"],
+            "command": command, "command_sha256": sha256(command), "exit_code": 0,
+            "verdict": "PASS", "timestamp": "2026-10-19T00:00:00+00:00",
+            "previous_event_hash": None,
+        }
+        forged["event_hash"] = sha256(forged)
+        (session / "evidence.jsonl").write_text(canonical_json(forged) + "\n")
+        gate = json.loads(test_runtime.run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertEqual(gate["decision"], "continue")
+        self.assertIn("anchor", gate["reason"])
+
     def test_validator_timeout_records_fail(self):
         command = [sys.executable, "-c", "import time; time.sleep(30)"]
         session = self.init({"mode": "implement", "objective": "x",
@@ -221,6 +289,138 @@ class EvidenceV5Tests(unittest.TestCase):
         out = json.loads(run.stdout)
         self.assertTrue(out.get("timed_out"))
         self.assertEqual(out.get("verdict"), "FAIL")
+
+
+class EvidenceAnchorFailureTests(unittest.TestCase):
+    """Blockers A/B/C: anchor-store failures stay fail-closed without crashing."""
+
+    def test_broken_anchor_store_marks_pending_and_blocks_gate(self):
+        # Blocker B(1): the anchor directory path is blocked by a file, so
+        # anchoring fails, but the ledger append still succeeds, flagged.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / ".gravitas" / "sessions" / "task"
+            home = root / "private-home"
+            session.mkdir(parents=True)
+            blocked = home / ".gravitas" / "anchors"
+            blocked.parent.mkdir(parents=True)
+            blocked.write_text("not a directory", encoding="utf-8")
+            with patch.dict(os.environ, {"HOME": str(home), "USERPROFILE": str(home)}):
+                record = append_evidence(session, {"source": "read", "file": "a.py"})
+                self.assertTrue(record.get("anchor_pending"))
+                self.assertIn("anchor_error", record)
+                # The ledger entry itself is durable and schema-valid.
+                ledger = [json.loads(line)
+                          for line in (session / "evidence.jsonl").read_text(encoding="utf-8").splitlines()]
+                self.assertEqual(len(ledger), 1)
+                self.assertTrue(ledger[0].get("anchor_pending"))
+                from jsonschema import Draft7Validator
+                schema = json.loads((ROOT / "schemas/evidence.schema.json").read_text())
+                Draft7Validator(schema).validate(ledger[0])
+                # Blocker B(2): verification reports a deficit, not a crash.
+                valid, reason = verify_with_anchor(session)
+                self.assertFalse(valid)
+                self.assertIn("anchor pending", reason)
+
+    def test_corrupt_anchor_file_marks_pending_without_crash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / ".gravitas" / "sessions" / "task"
+            home = root / "private-home"
+            session.mkdir(parents=True)
+            with patch.dict(os.environ, {"HOME": str(home), "USERPROFILE": str(home)}):
+                first = append_evidence(session, {"source": "read", "file": "a.py"})
+                self.assertNotIn("anchor_pending", first)
+                anchor_path(session).write_text("garbage{{{not json\n", encoding="utf-8")
+                second = append_evidence(session, {"source": "read", "file": "b.py"})
+                self.assertTrue(second.get("anchor_pending"))
+                # A corrupt anchor chain stays fail-closed (deficit, no traceback).
+                self.assertFalse(verify_with_anchor(session)[0])
+
+    def test_post_tool_survives_broken_anchor_store(self):
+        # Hook contract: stdout {} and RC 0 even when anchoring fails.
+        with tempfile.TemporaryDirectory() as directory:
+            cwd = Path(directory)
+            blocked = cwd / ".test-user-home" / ".gravitas" / "anchors"
+            blocked.parent.mkdir(parents=True)
+            blocked.write_text("not a directory", encoding="utf-8")
+            result = test_runtime.run_script(
+                "post_tool.py",
+                {"toolCall": {"name": "view_file",
+                              "args": {"AbsolutePath": str(cwd / "m.py")}}},
+                cwd=cwd)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout), {})
+
+    def test_resolve_failure_writes_no_marker_when_ledger_append_fails(self):
+        # Blocker A: ledger-first ordering leaves no orphan marker behind.
+        import gravitas_cli
+        with tempfile.TemporaryDirectory() as directory:
+            session = Path(directory) / "session"
+            session.mkdir()
+            (session / "failures.jsonl").write_text(json.dumps({
+                "tool": "write_to_file",
+                "input_summary": {"TargetFile": "new.txt"},
+                "fingerprint": "fp-orphan",
+                "cause": "flaky env",
+            }) + "\n", encoding="utf-8")
+            before = (session / "failures.jsonl").read_text(encoding="utf-8")
+            args = argparse.Namespace(session_dir=str(session), fingerprint="fp-orphan",
+                                      reason="cause gone", file=[], criterion_id=[])
+            with patch("evidence_chain.append_evidence", side_effect=OSError("disk full")):
+                buffer = io.StringIO()
+                with redirect_stdout(buffer):
+                    rc = gravitas_cli.cmd_resolve_failure(args)
+            self.assertEqual(rc, 1)
+            self.assertIn("could not be anchored", buffer.getvalue())
+            self.assertEqual((session / "failures.jsonl").read_text(encoding="utf-8"), before)
+            self.assertFalse((session / "evidence.jsonl").exists())
+
+    def test_backfill_anchors_legacy_ledger(self):
+        # Blocker C: pre-anchor ledger -> actionable deficit -> backfill -> verify passes.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / ".gravitas" / "sessions" / "legacy"
+            home = root / "private-home"
+            session.mkdir(parents=True)
+            previous = None
+            for name in ("a.py", "b.py"):
+                entry = {"source": "read", "file": name,
+                         "timestamp": "2026-01-01T00:00:00+00:00",
+                         "previous_event_hash": previous}
+                entry["event_hash"] = sha256(dict(entry))
+                with (session / "evidence.jsonl").open("a", encoding="utf-8") as handle:
+                    handle.write(canonical_json(entry) + "\n")
+                previous = entry["event_hash"]
+            env = os.environ.copy()
+            env["HOME"] = str(home)
+            if os.name == "nt":
+                env["USERPROFILE"] = str(home)
+            with patch.dict(os.environ, {"HOME": str(home), "USERPROFILE": str(home)}):
+                valid, reason = verify_with_anchor(session)
+                self.assertFalse(valid)
+                self.assertIn("backfill", reason)
+                ok, detail = backfill_anchors(session)
+                self.assertTrue(ok, detail)
+                self.assertEqual(verify_with_anchor(session),
+                                 (True, "chain valid; ledger head anchored"))
+                self.assertTrue(backfill_anchors(session)[0])
+            # The CLI surfaces the same upgrade path.
+            legacy2 = root / ".gravitas" / "sessions" / "legacy2"
+            legacy2.mkdir(parents=True)
+            shutil.copy(session / "evidence.jsonl", legacy2 / "evidence.jsonl")
+            bare = subprocess.run(
+                [sys.executable, str(ROOT / "gravitas_cli.py"), "verify",
+                 "--session-dir", str(legacy2)],
+                text=True, capture_output=True, cwd=ROOT, env=env, check=False)
+            self.assertNotEqual(bare.returncode, 0)
+            self.assertIn("backfill", json.loads(bare.stdout)["reason"])
+            filled = subprocess.run(
+                [sys.executable, str(ROOT / "gravitas_cli.py"), "verify",
+                 "--session-dir", str(legacy2), "--backfill-anchors"],
+                text=True, capture_output=True, cwd=ROOT, env=env, check=False)
+            self.assertEqual(filled.returncode, 0, filled.stderr)
+            self.assertTrue(json.loads(filled.stdout)["valid"])
 
 
 class InitV5Tests(unittest.TestCase):

@@ -20,12 +20,20 @@ schema). OpenCode v2 uses a different `permissions`-array schema; see
 
 ## Capability differences (honest)
 
-- No lifecycle hooks: OpenCode has `tool.execute.before` (block by
-  throwing) but no Stop-gate equivalent. Completion gating runs manually
-  via `gravitas summarize` + validator evidence, not automatic denial.
+- OpenCode has `tool.execute.before` (block by throwing) and an
+  after-completion hook, but no Stop-gate equivalent. Completion gating runs
+  manually via `gravitas summarize` + validator evidence, not automatic denial.
 - `force_ask` resolves to hard deny in the shim (no ask channel).
-- Evidence ledger integration is manual (`gravitas validator`, `gravitas
-  repro`); the shim enforces policy only, it does not record sessions.
+- Validator evidence remains manual (`gravitas validator`, `gravitas repro`);
+  completion events only dirty freshness and never count as PASS evidence.
+  Successful `edit`, `write`, `patch`, and mutating `bash` completions are
+  recorded in `.gravitas/opencode-completions.jsonl` with their OpenCode
+  session ID. Failed reads are not recorded as successful completion events.
+- To include those mutations in freshness checks, bind validator evidence to
+  `.gravitas/sessions/opencode-<sha256(session-id)>/` using the exact session
+  ID from OpenCode. The guard reports stale criterion IDs; completion events
+  never repair or satisfy evidence.
 - The shim shells to `gravitas guard` (python3 required). If unreachable,
-  calls are allowed with a logged warning -- run `gravitas doctor`.
-- Session isolation is per-workspace-contract, not per-conversation.
+  mutating calls are denied; run `gravitas doctor`.
+- The workspace contract is shared, while completion evidence is filtered by
+  the exact OpenCode conversation/session ID.

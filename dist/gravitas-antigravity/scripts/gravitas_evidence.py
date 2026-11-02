@@ -12,11 +12,15 @@ final mutation cannot satisfy the finish gate.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 STATES = ("PENDING", "SUPPORTED", "PASS", "FAIL", "BLOCKED", "UNVERIFIABLE")
 
 OWNED_SOURCES = ("validator",)
+
+UNKNOWN_WRITE_TIME = datetime.max.replace(tzinfo=timezone.utc)
 
 
 def parse_time(value: object) -> datetime | None:
@@ -42,14 +46,65 @@ def owned_validator_pass(entry: dict) -> bool:
     )
 
 
+def declared_validator_pass(entry: dict, validator: dict) -> bool:
+    """Require completion evidence to use the contract-declared argv."""
+    return (
+        owned_validator_pass(entry)
+        and entry.get("command") == validator.get("command")
+    )
+
+
 def last_write_time(evidence: list[dict]) -> datetime | None:
     latest = None
     for entry in evidence:
-        if entry.get("source") == "write":
+        if isinstance(entry, dict) and entry.get("source") == "write":
             moment = parse_time(entry.get("timestamp"))
-            if moment and (latest is None or moment > latest):
+            if moment is None:
+                return UNKNOWN_WRITE_TIME
+            if latest is None or moment > latest:
                 latest = moment
     return latest
+
+
+def opencode_completion_writes(path, session_id: str) -> list[dict]:
+    """Convert successful, session-matched OpenCode mutations into dirty evidence."""
+    if not session_id:
+        return []
+    path = Path(path)
+    if not path.exists():
+        return []
+    writes = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            entry = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if (not isinstance(entry, dict)
+                or entry.get("session_id") != session_id
+                or entry.get("success") is not True):
+            continue
+        tool = entry.get("tool")
+        mutating = tool in ("edit", "write", "patch")
+        if tool == "bash":
+            args = entry.get("args")
+            command = args.get("command") if isinstance(args, dict) else None
+            if isinstance(command, str) and command:
+                from gravitas_action import classify_shell
+                mutating = classify_shell(command).get("mutation") in (
+                    "mutation", "destructive", "write"
+                )
+            else:
+                mutating = True
+        if not mutating:
+            continue
+        writes.append({
+            "source": "write",
+            "file": None,
+            "timestamp": entry.get("timestamp"),
+            "opencode_session_id": session_id,
+            "completion_tool": tool,
+        })
+    return writes
 
 
 def is_fresh(entry: dict, evidence: list[dict]) -> bool:
@@ -57,6 +112,8 @@ def is_fresh(entry: dict, evidence: list[dict]) -> bool:
     if moment is None:
         return False
     cutoff = last_write_time(evidence)
+    if cutoff is UNKNOWN_WRITE_TIME:
+        return False
     return cutoff is None or moment > cutoff
 
 

@@ -52,12 +52,109 @@ class ClassifierHardeningTests(unittest.TestCase):
     def test_rg_plain_stays_none(self):
         self.assertEqual(classify_shell("rg -n foo src")["mutation"], "none")
 
+    def test_redirections_without_surrounding_whitespace(self):
+        for command in ("echo hi>out.txt", "echo hi>>out.txt", "ls 2>err.txt",
+                        "echo hi> out.txt", "echo hi>> out.txt", "echo hi >out.txt",
+                        "echo hi >>out.txt", "cat<in.txt", "cat< in.txt",
+                        "cat <in.txt", ">out.txt", ">>out.txt", "2>err.txt",
+                        ">file", ">>file", "2>file", "> file"):
+            with self.subTest(command=command):
+                self.assertEqual(classify_shell(command)["mutation"], "mutation", command)
+
+    def test_redirect_without_whitespace_paths_extracted(self):
+        self.assertEqual(classify_shell("echo hi>out.txt")["paths"], ["out.txt"])
+        self.assertEqual(classify_shell("echo hi>>out.txt")["paths"], ["out.txt"])
+        self.assertEqual(classify_shell("ls 2>err.txt")["paths"], ["err.txt"])
+        self.assertEqual(classify_shell("cat<in.txt")["paths"], ["in.txt"])
+
+    def test_dangerous_leading_env_vars_classified_mutation(self):
+        for command in (
+            "LD_PRELOAD=/tmp/x.so ls",
+            "LD_LIBRARY_PATH=/tmp/evil ls",
+            "DYLD_INSERT_LIBRARIES=/tmp/x.dylib ls",
+            "GIT_PAGER=./evil git log",
+            "PAGER=./evil git log",
+            "GIT_EXTERNAL_DIFF=./evil git diff",
+            "GIT_EDITOR=./evil git status",
+            "PYTHONPATH=/tmp/evil python3 --version",
+            "NODE_OPTIONS='--require /evil.js' node --version",
+            "BASH_ENV=/tmp/evil bash --version",
+            "env LD_PRELOAD=/tmp/x.so ls",
+            "sudo GIT_PAGER=./evil git log",
+            "env -i PAGER=./evil git log",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(classify_shell(command)["mutation"], "mutation", command)
+
+    def test_inert_leading_env_vars_remain_read_only(self):
+        for command in (
+            "VAR=1 ls",
+            "DEBUG=1 git status",
+            "LANG=C git status",
+            "LC_ALL=C git diff",
+            "FOO=bar echo hello",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(classify_shell(command)["mutation"], "none", command)
+    def test_wrapper_commands_with_flags_preserve_severity(self):
+        for command in (
+            "sudo -n rm x",
+            "nice -n5 rm x",
+            "nice -n 5 rm x",
+            "nice -5 rm x",
+            "sudo -u root rm x",
+            "sudo -u root -g wheel rm x",
+            "sudo -E rm x",
+            "sudo -- rm x",
+            "stdbuf -oL rm x",
+            "stdbuf -i0 -o0 -e0 rm x",
+            "time -p rm x",
+            "command -p rm x",
+            "sudo -n nice -n5 rm x",
+            "sudo -n git reset --hard",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(classify_shell(command)["mutation"], "destructive", command)
+
+    def test_wrapper_commands_with_flags_read_only(self):
+        for command in (
+            "sudo -n ls",
+            "nice -n5 ls",
+            "nice -n 10 git diff",
+            "sudo -u root ls",
+            "sudo -E ls",
+            "stdbuf -oL ls",
+            "time -p ls",
+            "command -p ls",
+            "sudo -- ls",
+            "sudo -n git status",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(classify_shell(command)["mutation"], "none", command)
+
+    def test_wrapper_unknown_flag_fails_closed_to_destructive(self):
+        for command in (
+            "sudo --unknown-flag rm x",
+            "sudo --unknown-flag ls",
+            "nice --unknown-flag ls",
+            "stdbuf --unknown-flag ls",
+            "time --unknown-flag ls",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(classify_shell(command)["mutation"], "destructive", command)
+
     def test_git_read_only_subcommands_with_write_or_exec_flags(self):
         for command in ("git diff --output=out.patch", "git show --output out.txt HEAD",
                         "git log --output=o", "git diff --ext-diff",
                         "git -c diff.external=./hook diff", "git -c core.pager=./x log",
                         "git -c include.path=/tmp/evil log", "git -c core.askpass=/tmp/evil log",
                         "git -c includeIf.gitdir:/foo.path=/tmp/evil diff",
+                        "git -C sub -c core.pager=./x log",
+                        "git --git-dir /tmp/x -c core.pager=./p log",
+                        "git --work-tree /tmp/w -c core.pager=./p log",
+                        "git --git-dir=/tmp/x -c core.pager=./p log",
+                        "git --work-tree=/tmp/w -c core.pager=./p log",
+                        "git -C /tmp/a -C /tmp/b -c diff.external=./hook diff",
                         "git branch newbranch", "git branch feat HEAD~1",
                         "git branch -u origin/main", "git branch --set-upstream-to=origin/main"):
             with self.subTest(command=command):
@@ -72,6 +169,8 @@ class ClassifierHardeningTests(unittest.TestCase):
         for command in ("git branch", "git branch -a", "git branch -vv", "git branch --show-current",
                         "git branch --list 'feat*'", "git branch --merged main",
                         "git branch --contains HEAD", "git diff --stat", "git -c color.ui=never diff",
+                        "git -C sub -c color.ui=never log", "git --git-dir /tmp/x -c color.ui=never status",
+                        "git --work-tree /tmp/w -c color.ui=never diff",
                         "git log --oneline -5", "git -C sub status"):
             with self.subTest(command=command):
                 self.assertEqual(classify_shell(command)["mutation"], "none", command)
@@ -111,6 +210,12 @@ class ClassifierHardeningTests(unittest.TestCase):
         self.assertIn("out2", result["paths"])
         dd = classify_shell("dd if=/dev/zero of=disk.img bs=1M")
         self.assertIn("disk.img", dd["paths"])
+        sed = classify_shell("sed -i s/a/b/ a.py")
+        self.assertEqual(sed["paths"], ["a.py"])
+        sed_multi = classify_shell("sed -i.bak -e s/a/b/ a.py b.py")
+        self.assertEqual(sed_multi["paths"], ["a.py", "b.py"])
+        sed_read = classify_shell("sed s/a/b/ a.py")
+        self.assertEqual(sed_read["paths"], [])
 
     def test_quiet_queries_stay_none(self):
         for command in ("git status", "ls -la", "sed s/a/b/ f", "npm ls", "pip list"):

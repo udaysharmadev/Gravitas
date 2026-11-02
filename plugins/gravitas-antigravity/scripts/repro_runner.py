@@ -95,7 +95,12 @@ def main() -> int:
             "reason": args.reason,
             "evidence": f"reproduction impossible: {args.reason}",
         }
-        saved = append_evidence(session_dir, record)
+        try:
+            saved = append_evidence(session_dir, record)
+        except (OSError, ValueError) as error:
+            print(json.dumps({"verdict": "UNVERIFIABLE",
+                              "evidence_error": f"evidence append failed: {error}"}))
+            return 1
         print(json.dumps({"verdict": "UNVERIFIABLE", "event_hash": saved["event_hash"]}))
         return 0
 
@@ -126,7 +131,13 @@ def main() -> int:
         "evidence": f"reproducer ({args.phase}) {'timed out' if timed_out else f'exited {rc}'}",
         "verdict": "FAIL" if (timed_out or rc != 0) else "PASS",
     }
-    saved = append_evidence(session_dir, record)
+    try:
+        saved = append_evidence(session_dir, record)
+    except (OSError, ValueError) as error:
+        print(json.dumps({"verdict": record["verdict"], "exit_code": rc,
+                          "timed_out": timed_out,
+                          "evidence_error": f"evidence append failed: {error}"}))
+        return 1
     print(json.dumps({"verdict": saved["verdict"], "exit_code": rc,
                       "timed_out": timed_out, "event_hash": saved["event_hash"]}))
     return rc if not timed_out else 124

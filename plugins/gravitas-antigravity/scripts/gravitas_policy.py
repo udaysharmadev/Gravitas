@@ -22,7 +22,16 @@ import hashlib
 import json
 from pathlib import Path
 
-from gravitas_action import LEVELS, Action, HostEnvelope, normalize, workspace_roots
+from gravitas_action import (
+    LEVELS,
+    Action,
+    HostEnvelope,
+    canonical_path,
+    case_insensitive_fs,
+    normalize,
+    path_key,
+    workspace_roots,
+)
 
 MODES = frozenset({
     "answer", "research", "plan", "review", "security-review",
@@ -34,11 +43,18 @@ READ_ONLY_MODES = frozenset({"answer", "research", "plan", "review", "security-r
 MODE_ALIASES = {"plan-only": "plan", "review-only": "review"}
 
 
+# Unknown, empty, or non-string modes must not buy write access: they fall back
+# to the most restrictive read-only mode. A missing "mode" key is a separate
+# case, handled by callers via ``contract.get("mode", "implement")``.
+FAIL_CLOSED_MODE = "answer"
+
+
 def normalize_mode(mode: object) -> str:
     if not isinstance(mode, str):
-        return "implement"
+        return FAIL_CLOSED_MODE
+    mode = mode.strip().lower()
     mode = MODE_ALIASES.get(mode, mode)
-    return mode if mode in MODES else "implement"
+    return mode if mode in MODES else FAIL_CLOSED_MODE
 
 
 def action_fingerprint(tool: str, args: dict) -> str:
@@ -46,23 +62,37 @@ def action_fingerprint(tool: str, args: dict) -> str:
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
-def target_in_scope(target: str, scopes: list, roots: list[Path]) -> bool:
-    target_path = Path(target).resolve(strict=False)
-    if not Path(target).is_absolute():
-        candidates = [(root / target).resolve(strict=False) for root in roots]
-    else:
-        candidates = [target_path]
+def _path_is_within_scope(candidate: Path, scope: Path, *, case_insensitive: bool) -> bool:
+    """Compare concrete paths with a boundary-aware string check.
+
+    ``Path.relative_to`` follows the host filesystem semantics, which makes it
+    impossible to enforce a deliberate ``case_insensitive=False`` check on a
+    case-folding volume. The scope guard must therefore compare the folded path
+    strings directly and require a directory boundary (slash or backslash)
+    before a descendant match.
+    """
+    candidate_key = path_key(candidate, case_insensitive=case_insensitive).replace("\\", "/")
+    scope_key = path_key(scope, case_insensitive=case_insensitive).replace("\\", "/").rstrip("/")
+    if not scope_key:
+        return True
+    return candidate_key == scope_key or candidate_key.startswith(scope_key + "/")
+
+
+def target_in_scope(target: str, scopes: list, roots: list[Path], *,
+                    case_insensitive: bool | None = None) -> bool:
+    """Both sides go through canonical_path + path_key: ``..`` and symlink
+    escapes resolve before comparison, and case folds only when the scope's
+    own volume folds (roots and absolute scopes may sit on different ones)."""
+    candidates = {canonical_path(target, [root]) for root in roots}
     for scope in scopes:
         if not isinstance(scope, str) or not scope:
             continue
         for root in roots:
-            scope_path = (root / scope).resolve(strict=False) if not Path(scope).is_absolute() else Path(scope).resolve(strict=False)
+            scope_path = canonical_path(scope, [root])
+            fold = case_insensitive_fs(scope_path) if case_insensitive is None else case_insensitive
             for candidate in candidates:
-                try:
-                    candidate.relative_to(scope_path)
+                if _path_is_within_scope(candidate, scope_path, case_insensitive=fold):
                     return True
-                except ValueError:
-                    continue
     return False
 
 
@@ -110,9 +140,12 @@ def evaluate_action(action: Action, *, mode: str, allowed_scope: list,
 
     # 4. Read-before-write check.
     if action.kind == "write" and action.paths:
-        target_path = Path(action.paths[0]).resolve(strict=False)
-        read_paths = {Path(item).resolve(strict=False) for item in reads}
-        if target_path.exists() and target_path not in read_paths:
+        # Ledger rows may predate record-time canonicalization, so both
+        # sides are canonicalized here; exists() uses the unfolded path.
+        target_path = canonical_path(action.paths[0], roots)
+        fold = case_insensitive_fs(target_path)
+        read_keys = {path_key(canonical_path(item, roots), case_insensitive=fold) for item in reads}
+        if target_path.exists() and path_key(target_path, case_insensitive=fold) not in read_keys:
             return ("deny",
                     f"Read-before-write violation: {action.paths[0]} has not been read this session. "
                     f"Read the file before editing it (Rule 1).")
@@ -176,7 +209,9 @@ def decide(signals: dict) -> dict:
         # security, auth, or migration work.
         if not high_stakes:
             reason_codes.append("read-only-or-trivial" if signals.get("read_only") else "trivial-localized")
-            return _record("direct", "target", "targeted", "none", reason_codes)
+            return _with_delegation(
+                _record("direct", "target", "targeted", "none", reason_codes),
+                signals, high_stakes=high_stakes)
 
     if (signals.get("assumptions_invalidated") or signals.get("scope_expanded")
             or repeated >= 2 or signals.get("validator_failure") == "diagnosis-changed"):
@@ -190,7 +225,7 @@ def decide(signals: dict) -> dict:
             reason_codes.append("validator-changed-diagnosis")
         return _with_delegation(
             _record("replan", "dependency", "impact", "none", reason_codes),
-            signals, high_stakes=True)
+            signals, high_stakes=high_stakes)
 
     if high_stakes or uncertainty == "high":
         for key in ("destructive", "security", "auth", "migration", "broad_fanout"):
@@ -215,7 +250,9 @@ def decide(signals: dict) -> dict:
             signals, high_stakes=False)
 
     reason_codes.append("single-file-low-uncertainty")
-    return _record("direct", "target", "targeted", "none", reason_codes)
+    return _with_delegation(
+        _record("direct", "target", "targeted", "none", reason_codes),
+        signals, high_stakes=high_stakes)
 
 
 def _record(planning: str, context_depth: str, verification_depth: str,
@@ -266,7 +303,7 @@ def policy_record_for_contract(contract: dict, signals: dict) -> dict:
 
 
 __all__ = [
-    "MODES", "READ_ONLY_MODES", "MODE_ALIASES", "normalize_mode",
+    "MODES", "READ_ONLY_MODES", "MODE_ALIASES", "FAIL_CLOSED_MODE", "normalize_mode",
     "action_fingerprint", "target_in_scope", "evaluate_action",
     "decide", "policy_record_for_contract", "normalize", "workspace_roots",
     "Action", "HostEnvelope",

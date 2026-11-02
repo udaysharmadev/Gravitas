@@ -15,7 +15,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from evidence_chain import append_evidence, sha256
+from evidence_chain import append_evidence, resolution_links, sha256
 from gravitas_action import confine_cwd
 
 #: Default wall-clock bound per validator execution (seconds).
@@ -69,7 +69,13 @@ def validate_invocation(contract: dict, validator_id: str, criterion_ids: list[s
     validator = validators.get(validator_id)
     if not validator:
         raise ValueError(f"validator_id {validator_id!r} is not declared by this contract")
-    if command != validator.get("command"):
+    declared = validator.get("command")
+    if not isinstance(declared, list) or not declared or not all(isinstance(part, str) for part in declared):
+        raise ValueError(
+            f"validator {validator_id!r} must declare its command as a non-empty argv array of strings "
+            f"(got {type(declared).__name__}); string-form commands are not supported"
+        )
+    if command != declared:
         raise ValueError("validator command differs from the contract declaration")
 
     criteria = {
@@ -123,6 +129,9 @@ def main() -> int:
         "source": "validator",
         "validator_id": args.validator_id,
         "criterion_ids": args.criterion_id,
+        "resolution_ids": resolution_links(
+            session_dir, source="validator", criterion_ids=args.criterion_id
+        ),
         "command": command,
         "command_sha256": sha256(command),
         "exit_code": rc,
@@ -134,7 +143,16 @@ def main() -> int:
         "verdict": verdict,
         **git_snapshot(cwd),
     }
-    saved = append_evidence(session_dir, record)
+    try:
+        saved = append_evidence(session_dir, record)
+    except (OSError, ValueError) as error:
+        # The validator ran; only its evidence record was lost. Report the
+        # loss explicitly (fail-closed: the gate requires the ledger entry)
+        # instead of dying with a traceback that breaks the JSON protocol.
+        print(json.dumps({"verdict": verdict, "exit_code": rc,
+                          "timed_out": timed_out,
+                          "evidence_error": f"evidence append failed: {error}"}))
+        return 1
     print(json.dumps({"verdict": saved["verdict"], "exit_code": rc,
                       "timed_out": timed_out, "event_hash": saved["event_hash"]}))
     return rc if not timed_out else 124

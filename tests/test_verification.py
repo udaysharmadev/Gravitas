@@ -13,7 +13,13 @@ SCRIPTS = ROOT / "plugins/gravitas-antigravity/scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import test_runtime
-from gravitas_evidence import criterion_states, evidence_deficit
+from gravitas_evidence import (
+    UNKNOWN_WRITE_TIME,
+    criterion_states,
+    evidence_deficit,
+    is_fresh,
+    last_write_time,
+)
 from gravitas_verify import discover_validators, escalation_plan, expand_cases
 
 
@@ -153,6 +159,48 @@ class EvidenceStateTests(unittest.TestCase):
             self.owned_pass("2026-10-07T10:00:00+00:00"),
             {"source": "write", "file": "a.py", "timestamp": "2026-10-07T11:00:00+00:00"},
         ])
+        self.assertEqual(states["AC-1"]["status"], "PENDING")
+        self.assertEqual(states["AC-1"]["stale_owned"], 1)
+
+    def test_write_missing_timestamp_invalidates_pass(self):
+        ev = [
+            self.owned_pass("2026-10-07T10:00:00+00:00"),
+            {"source": "write", "file": "a.py"},
+        ]
+        self.assertIs(last_write_time(ev), UNKNOWN_WRITE_TIME)
+        self.assertFalse(is_fresh(ev[0], ev))
+        states = criterion_states(self.contract(), ev)
+        self.assertEqual(states["AC-1"]["status"], "PENDING")
+        self.assertEqual(states["AC-1"]["stale_owned"], 1)
+
+    def test_write_garbage_timestamp_invalidates_pass(self):
+        ev = [
+            self.owned_pass("2026-10-07T10:00:00+00:00"),
+            {"source": "write", "file": "a.py", "timestamp": "not-a-time"},
+        ]
+        self.assertIs(last_write_time(ev), UNKNOWN_WRITE_TIME)
+        self.assertFalse(is_fresh(ev[0], ev))
+        states = criterion_states(self.contract(), ev)
+        self.assertEqual(states["AC-1"]["status"], "PENDING")
+        self.assertEqual(states["AC-1"]["stale_owned"], 1)
+
+    def test_pre_pass_write_leaves_pass_fresh(self):
+        ev = [
+            {"source": "write", "file": "a.py", "timestamp": "2026-10-07T09:00:00+00:00"},
+            self.owned_pass("2026-10-07T10:00:00+00:00"),
+        ]
+        self.assertTrue(is_fresh(ev[1], ev))
+        states = criterion_states(self.contract(), ev)
+        self.assertEqual(states["AC-1"]["status"], "PASS")
+        self.assertEqual(states["AC-1"]["stale_owned"], 0)
+
+    def test_well_formed_write_after_pass_invalidates(self):
+        ev = [
+            self.owned_pass("2026-10-07T10:00:00+00:00"),
+            {"source": "write", "file": "a.py", "timestamp": "2026-10-07T11:00:00+00:00"},
+        ]
+        self.assertFalse(is_fresh(ev[0], ev))
+        states = criterion_states(self.contract(), ev)
         self.assertEqual(states["AC-1"]["status"], "PENDING")
         self.assertEqual(states["AC-1"]["stale_owned"], 1)
 

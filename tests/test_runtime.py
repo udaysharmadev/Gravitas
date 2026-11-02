@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import os
 import subprocess
@@ -6,21 +7,30 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from jsonschema import Draft7Validator, ValidationError
 
 
 ROOT = Path(__file__).parents[1]
 SCRIPTS = ROOT / "plugins/gravitas-antigravity/scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 
 
 def run_script(name, payload=None, *args, cwd):
+    env = os.environ.copy()
+    isolated_home = str(Path(cwd) / ".test-user-home")
+    env["HOME"] = isolated_home
+    if os.name == "nt":
+        env["USERPROFILE"] = isolated_home
     return subprocess.run(
         [sys.executable, str(SCRIPTS / name), *args],
         input=json.dumps(payload) if payload is not None else None,
         text=True,
         capture_output=True,
         cwd=cwd,
+        env=env,
         check=False,
     )
 
@@ -48,6 +58,32 @@ class RuntimeTests(unittest.TestCase):
         state = json.loads((session / "state.json").read_text())
         self.assertEqual(state["read_files"], [])
         self.assertEqual(json.loads((session / "coverage.json").read_text()), {"AC1": "PENDING"})
+
+    def test_stop_gate_rejects_contract_without_acceptance_criteria(self):
+        session = self.init({"mode": "implement", "objective": "x"})
+        decision = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertEqual(decision["decision"], "continue")
+        self.assertIn("no acceptance criteria", decision["reason"])
+
+    def test_stop_gate_rejects_missing_contract(self):
+        session = self.init({"mode": "implement", "objective": "x", "acceptance_criteria": ["AC1"]})
+        (session / "contract.json").unlink()
+        decision = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertEqual(decision["decision"], "continue")
+        self.assertIn("contract is missing or invalid", decision["reason"])
+
+    def test_stop_gate_rejects_corrupt_contract(self):
+        session = self.init({"mode": "implement", "objective": "x", "acceptance_criteria": ["AC1"]})
+        (session / "contract.json").write_text("{not-json")
+        decision = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertEqual(decision["decision"], "continue")
+        self.assertIn("contract is missing or invalid", decision["reason"])
+    def test_stop_gate_rejects_missing_evidence_for_criteria(self):
+        session = self.init({"mode": "implement", "objective": "x", "acceptance_criteria": ["AC1"]})
+        (session / "evidence.jsonl").unlink()
+        decision = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertEqual(decision["decision"], "continue")
+        self.assertIn("no verification evidence", decision["reason"])
 
     def test_init_rejects_task_id_path_traversal(self):
         result = run_script(
@@ -133,7 +169,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout), {})
         entries = [json.loads(line) for line in (session / "evidence.jsonl").read_text().splitlines()]
         self.assertEqual(entries[-1]["source"], "read")
-        self.assertEqual(entries[-1]["file"], str(target))
+        self.assertEqual(entries[-1]["file"], str(target.resolve()))
         schema = json.loads((ROOT / "schemas/evidence.schema.json").read_text())
         Draft7Validator(schema).validate(entries[-1])
 
@@ -184,6 +220,85 @@ class RuntimeTests(unittest.TestCase):
         self.assertIn("event_hash", entry)
         self.assertEqual(json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)["decision"], "allow")
 
+    def test_shell_mutations_emit_write_records(self):
+        session = self.init({"mode": "implement", "objective": "x"})
+        for cmd in ("echo hi > a.py", "cat x | tee a.py", "sed -i s/a/b/ a.py"):
+            payload = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": cmd}},
+                "success": True,
+            }
+            res = run_script("post_tool.py", payload, cwd=self.cwd)
+            self.assertEqual(json.loads(res.stdout), {})
+        for cmd in ("ls", "git status"):
+            payload = {
+                "toolCall": {"name": "run_command", "args": {"CommandLine": cmd}},
+                "success": True,
+            }
+            res = run_script("post_tool.py", payload, cwd=self.cwd)
+            self.assertEqual(json.loads(res.stdout), {})
+
+        entries = [json.loads(line) for line in (session / "evidence.jsonl").read_text().splitlines()]
+        writes = [e for e in entries if e.get("source") == "write"]
+        self.assertEqual(len(writes), 3)
+        for write in writes:
+            self.assertEqual(write["file"], "a.py")
+            self.assertTrue(write["success"])
+
+    def test_shell_mutation_invalidates_prior_validator_pass_end_to_end(self):
+        session = self.init({
+            "mode": "implement", "objective": "x",
+            "acceptance_criteria": [{"id": "tests", "statement": "tests pass", "validators": ["unit"]}],
+            "validators": [{"id": "unit", "command": [sys.executable, "-c", "pass"], "criterion_ids": ["tests"]}],
+        })
+        result = run_script(
+            "validator_runner.py", None, "--session-dir", str(session), "--validator-id", "unit",
+            "--criterion-id", "tests", "--", sys.executable, "-c", "pass", cwd=self.cwd,
+        )
+        self.assertEqual(result.returncode, 0)
+        # PASS before shell mutation -> stop gate allows
+        gate_before = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertEqual(gate_before["decision"], "allow")
+
+        # Mutate file through shell
+        payload = {
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "echo hi > a.py"}},
+            "success": True,
+        }
+        run_script("post_tool.py", payload, cwd=self.cwd)
+
+        # Stop gate must now refuse completion because the PASS is stale
+        gate_after = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertEqual(gate_after["decision"], "continue")
+        self.assertIn("acceptance criteria have no verification evidence", gate_after["reason"])
+
+    def test_stop_gate_rejects_forged_validator_command(self):
+        declared_command = [sys.executable, "-c", "pass"]
+        session = self.init({
+            "mode": "implement", "objective": "x",
+            "acceptance_criteria": [{"id": "tests", "statement": "tests pass", "validators": ["unit"]}],
+            "validators": [{"id": "unit", "command": declared_command, "criterion_ids": ["tests"]}],
+        })
+        forged = {
+            "source": "validator",
+            "validator_id": "unit",
+            "criterion_ids": ["tests"],
+            "command": ["attacker-never-ran"],
+            "exit_code": 0,
+            "verdict": "PASS",
+            "timestamp": "2999-01-01T00:00:00+00:00",
+            "previous_event_hash": None,
+        }
+        from evidence_chain import append_evidence
+        with patch.dict(
+            os.environ, {"HOME": str(self.cwd / ".test-user-home"),
+                         "USERPROFILE": str(self.cwd / ".test-user-home")}
+        ):
+            append_evidence(session, forged)
+
+        gate = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertEqual(gate["decision"], "continue")
+        self.assertIn("unit", gate["reason"])
+
     def test_chain_verifier_detects_tampering(self):
         session = self.init({
             "mode": "implement", "objective": "x",
@@ -193,7 +308,12 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         ledger = session / "evidence.jsonl"
         ledger.write_text(ledger.read_text().replace('"exit_code":0', '"exit_code":1'))
-        cli = subprocess.run([sys.executable, str(ROOT / "gravitas_cli.py"), "verify", "--session-dir", str(session)], text=True, capture_output=True, cwd=self.cwd, check=False)
+        env = os.environ.copy()
+        isolated_home = str(self.cwd / ".test-user-home")
+        env["HOME"] = isolated_home
+        if os.name == "nt":
+            env["USERPROFILE"] = isolated_home
+        cli = subprocess.run([sys.executable, str(ROOT / "gravitas_cli.py"), "verify", "--session-dir", str(session)], text=True, capture_output=True, cwd=self.cwd, env=env, check=False)
         self.assertNotEqual(cli.returncode, 0)
 
     def test_validator_runner_rejects_undeclared_criterion_or_command(self):

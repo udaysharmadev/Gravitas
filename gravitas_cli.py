@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
+import shlex
 import shutil
 import subprocess
 import sys
@@ -120,11 +122,19 @@ def cmd_status(args: argparse.Namespace) -> int:
 def cmd_verify(args: argparse.Namespace) -> int:
     target = Path(args.session_dir) / "evidence.jsonl"
     try:
-        from evidence_chain import verify_chain
+        from evidence_chain import backfill_anchors, verify_with_anchor
     except ModuleNotFoundError:
         print(json.dumps({"valid": False, "reason": f"runtime assets not found under {ROOT}; reinstall gravitas or run from a checkout", "ledger": str(target)}))
         return 1
-    valid, reason = verify_chain(target)
+    if args.backfill_anchors:
+        ok, detail = backfill_anchors(Path(args.session_dir))
+        if not ok:
+            print(json.dumps({"valid": False, "backfilled": False, "reason": detail, "ledger": str(target)}))
+            return 1
+        valid, reason = verify_with_anchor(Path(args.session_dir))
+        print(json.dumps({"valid": valid, "backfilled": True, "reason": reason, "ledger": str(target)}))
+        return 0 if valid else 1
+    valid, reason = verify_with_anchor(Path(args.session_dir))
     print(json.dumps({"valid": valid, "reason": reason, "ledger": str(target)}))
     return 0 if valid else 1
 
@@ -251,11 +261,121 @@ def cmd_resolve_failure(args: argparse.Namespace) -> int:
     if not args.fingerprint or not args.reason:
         print(json.dumps({"ok": False, "error": "fingerprint and reason are both required"}))
         return 1
-    marker = {"fingerprint": args.fingerprint, "resolved": True, "reason": args.reason,
-              "timestamp": datetime.now(timezone.utc).isoformat()}
-    with (session_dir / "failures.jsonl").open("a", encoding="utf-8") as handle:
+    failures_path = session_dir / "failures.jsonl"
+    failures = []
+    if failures_path.exists():
+        for line in failures_path.read_text(encoding="utf-8").splitlines():
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(entry, dict):
+                failures.append(entry)
+
+    original = next((entry for entry in reversed(failures)
+                     if entry.get("fingerprint") == args.fingerprint
+                     and entry.get("resolved") is not True), None)
+    if original is None:
+        print(json.dumps({"ok": False, "error": "no unresolved failure matches that fingerprint"}))
+        return 1
+
+    input_summary = original.get("input_summary", {})
+    target_files = list(args.file)
+    if isinstance(input_summary, dict):
+        for key in ("TargetFile", "target_file", "filePath", "path", "AbsolutePath"):
+            value = input_summary.get(key)
+            if isinstance(value, str) and value:
+                target_files.append(value)
+    target_files = sorted(set(target_files))
+    if not target_files:
+        print(json.dumps({
+            "ok": False,
+            "error": "could not determine the failed action's target; supply --file before resolving",
+        }))
+        return 1
+
+    criterion_ids = set(args.criterion_id)
+    command = input_summary.get("CommandLine", input_summary.get("command", "")) if isinstance(input_summary, dict) else ""
+    contract_path = session_dir / "contract.json"
+    if contract_path.exists():
+        try:
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            contract = {}
+        if isinstance(contract, dict):
+            declared_criteria = {
+                item.get("id") for item in contract.get("acceptance_criteria", [])
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            }
+            unknown_criteria = criterion_ids - declared_criteria
+            if unknown_criteria:
+                print(json.dumps({
+                    "ok": False,
+                    "error": "unknown criterion ID(s): " + ", ".join(sorted(unknown_criteria)),
+                }))
+                return 1
+            validators = contract.get("validators", [])
+            if not isinstance(validators, list):
+                validators = []
+            for validator in validators:
+                declared_command = validator.get("command") if isinstance(validator, dict) else None
+                if (isinstance(command, str)
+                        and isinstance(declared_command, list)
+                        and all(isinstance(part, str) for part in declared_command)
+                        and command.strip() in (
+                            shlex.join(declared_command),
+                            subprocess.list2cmdline(declared_command),
+                        )):
+                    criterion_ids.update(
+                        identifier for identifier in validator.get("criterion_ids", [])
+                        if isinstance(identifier, str)
+                    )
+            undeclared = criterion_ids - declared_criteria
+            if undeclared:
+                print(json.dumps({
+                    "ok": False,
+                    "error": "validator references unknown criterion ID(s): "
+                    + ", ".join(sorted(undeclared)),
+                }))
+                return 1
+
+    resolved_at = datetime.now(timezone.utc).isoformat()
+    resolution_id = hashlib.sha256(
+        f"{args.fingerprint}\0{resolved_at}\0{args.reason}".encode("utf-8")
+    ).hexdigest()[:16]
+    marker = {
+        "fingerprint": args.fingerprint,
+        "resolved": True,
+        "resolution_id": resolution_id,
+        "reason": args.reason,
+        "timestamp": resolved_at,
+        "required_reads": target_files,
+        "criterion_ids": sorted(criterion_ids),
+    }
+    # Ledger-first ordering: the anchored evidence record must exist before
+    # its failure-log marker. If anchoring the record fails, no marker is
+    # written, so verification can never see an orphan "resolution metadata
+    # is not anchored" deficit.
+    try:
+        from evidence_chain import append_evidence
+        append_evidence(session_dir, {
+            "source": "failure_resolution",
+            "fingerprint": args.fingerprint,
+            "resolution_id": resolution_id,
+            "required_reads": target_files,
+            "criterion_ids": sorted(criterion_ids),
+            "reason": args.reason,
+            "timestamp": resolved_at,
+        })
+    except (ModuleNotFoundError, OSError, ValueError) as error:
+        print(json.dumps({"ok": False, "error": f"resolution marker could not be anchored: {error}"}))
+        return 1
+    with failures_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(marker) + "\n")
-    print(json.dumps({"ok": True, "fingerprint": args.fingerprint}))
+    print(json.dumps({"ok": True, "fingerprint": args.fingerprint,
+                      "resolution_id": resolution_id,
+                      "required_reads": target_files,
+                      "criterion_ids": sorted(criterion_ids)}))
     return 0
 
 
@@ -295,6 +415,29 @@ def _opencode_tool(tool: str, args: dict) -> tuple[str, dict]:
         return tool, args if isinstance(args, dict) else {}
     name, convert = mapped
     return name, convert(args if isinstance(args, dict) else {})
+
+
+def opencode_session_evidence(root: Path, session_id: str) -> list[dict]:
+    """Load completion and validator evidence without crossing OpenCode sessions."""
+    if not session_id:
+        return []
+    from gravitas_evidence import opencode_completion_writes
+
+    safe_id = hashlib.sha256(session_id.encode("utf-8")).hexdigest()
+    evidence_path = root / ".gravitas" / "sessions" / f"opencode-{safe_id}" / "evidence.jsonl"
+    entries = []
+    if evidence_path.exists():
+        for line in evidence_path.read_text(encoding="utf-8").splitlines():
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(entry, dict):
+                entries.append(entry)
+    completions = opencode_completion_writes(
+        root / ".gravitas" / "opencode-completions.jsonl", session_id
+    )
+    return entries + completions
 
 
 def cmd_guard(args: argparse.Namespace) -> int:
@@ -386,6 +529,17 @@ def cmd_guard(args: argparse.Namespace) -> int:
            "policy_state": policy_state}
     if reason:
         out["reason"] = reason
+    if envelope.host == "opencode" and envelope.conversation_id:
+        from gravitas_evidence import criterion_states
+        states = criterion_states(
+            contract, opencode_session_evidence(Path.cwd(), envelope.conversation_id)
+        )
+        stale = sorted(
+            identifier for identifier, info in states.items()
+            if info.get("stale_owned", 0) > 0
+        )
+        if stale:
+            out["stale_validator_criteria"] = stale
     if contract_warning and out["decision"] == "allow":
         out["warning"] = contract_warning
     if envelope.tool not in ("view_file", "grep_search", "find_by_name", "list_dir",
@@ -548,7 +702,7 @@ def main() -> int:
     sub = parser.add_subparsers(dest="subcommand", required=True)
     sub.add_parser("doctor").set_defaults(func=cmd_doctor)
     sub.add_parser("status").set_defaults(func=cmd_status)
-    verify = sub.add_parser("verify"); verify.add_argument("--session-dir", required=True); verify.set_defaults(func=cmd_verify)
+    verify = sub.add_parser("verify"); verify.add_argument("--session-dir", required=True); verify.add_argument("--backfill-anchors", action="store_true", help="anchor the current head of a pre-existing ledger, then verify"); verify.set_defaults(func=cmd_verify)
     gc = sub.add_parser("gc"); gc.add_argument("--older-than-days", type=int, default=30); gc.add_argument("--apply", action="store_true", help="delete instead of reporting"); gc.set_defaults(func=cmd_gc)
     validator = sub.add_parser("validator"); validator.add_argument("--session-dir", required=True); validator.add_argument("--validator-id", required=True); validator.add_argument("--criterion-id", action="append", default=[]); validator.add_argument("command", nargs=argparse.REMAINDER); validator.set_defaults(func=cmd_validator)
     decide = sub.add_parser("decide", help="Emit a planning-policy record (planning, context/verification depth, delegation, reason codes) from --signals JSON")
@@ -582,6 +736,10 @@ def main() -> int:
     resolve.add_argument("--session-dir", required=True)
     resolve.add_argument("--fingerprint", required=True)
     resolve.add_argument("--reason", required=True)
+    resolve.add_argument("--file", action="append", default=[],
+                         help="Target file that must be re-read before completion (repeatable)")
+    resolve.add_argument("--criterion-id", action="append", default=[],
+                         help="Criterion requiring a fresh validator PASS (repeatable)")
     resolve.set_defaults(func=cmd_resolve_failure)
     edge = sub.add_parser("edge-cases", help="Expand seed values into deterministic boundary variants")
     edge.add_argument("--seeds", default="[]", help="JSON array of seed values")

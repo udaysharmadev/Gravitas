@@ -1,4 +1,5 @@
 """OpenCode adapter tests: init scaffolding, guard, shim mapping."""
+import hashlib
 import json
 import re
 import shutil
@@ -7,12 +8,15 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
 ROOT = Path(__file__).parents[1]
 ADAPTER = ROOT / "adapters" / "opencode"
 
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "plugins" / "gravitas-antigravity" / "scripts"))
 from gravitas_init import init_antigravity, init_opencode
+from gravitas_evidence import opencode_completion_writes
 
 
 def frontmatter(path: Path) -> dict:
@@ -171,6 +175,61 @@ class GuardTests(unittest.TestCase):
             text=True, capture_output=True, cwd=ROOT, check=False)
         self.assertEqual(json.loads(result.stdout)["decision"], "deny")
 
+    def test_successful_opencode_mutation_stales_only_matching_session(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            gravitas = root / ".gravitas"
+            (gravitas / "sessions").mkdir(parents=True)
+            (gravitas / "opencode-contract.json").write_text(json.dumps({
+                "mode": "implement",
+                "allowed_write_scope": ["."],
+                "acceptance_criteria": [{"id": "AC1", "statement": "tests pass"}],
+            }))
+            session_id = "session-a"
+            session_dir = gravitas / "sessions" / (
+                "opencode-" + hashlib.sha256(session_id.encode("utf-8")).hexdigest()
+            )
+            session_dir.mkdir()
+            old = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+            (session_dir / "evidence.jsonl").write_text(json.dumps({
+                "source": "validator", "validator_id": "unit",
+                "criterion_ids": ["AC1"], "verdict": "PASS", "exit_code": 0,
+                "event_hash": "previous-pass", "timestamp": old,
+            }) + "\n")
+            completions = [
+                {"session_id": "session-a", "tool": "bash",
+                 "args": {"command": "echo changed > app.py"}, "success": True,
+                 "timestamp": datetime.now(timezone.utc).isoformat()},
+                {"session_id": "session-a", "tool": "edit",
+                 "args": {"filePath": "ignored.py"}, "success": False,
+                 "timestamp": datetime.now(timezone.utc).isoformat()},
+                {"session_id": "session-b", "tool": "write",
+                 "args": {"filePath": "other.py"}, "success": True,
+                 "timestamp": datetime.now(timezone.utc).isoformat()},
+            ]
+            completion_path = gravitas / "opencode-completions.jsonl"
+            completion_path.write_text("corrupt line\n" + "".join(
+                json.dumps(entry) + "\n" for entry in completions
+            ))
+            self.assertEqual(len(opencode_completion_writes(completion_path, "session-a")), 1)
+
+            def guard_for(current_session):
+                envelope = {
+                    "tool": "grep", "args": {"pattern": "value"},
+                    "workspace_roots": [str(root)], "host": "opencode",
+                    "conversation_id": current_session,
+                }
+                result = subprocess.run(
+                    [sys.executable, str(ROOT / "gravitas_cli.py"), "guard",
+                     "--envelope", json.dumps(envelope)],
+                    text=True, capture_output=True, cwd=root, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return json.loads(result.stdout)
+
+            self.assertEqual(guard_for("session-a")["stale_validator_criteria"], ["AC1"])
+            self.assertNotIn("stale_validator_criteria", guard_for("session-b"))
+
 
 class ShimMappingTests(unittest.TestCase):
     def test_to_envelope_mapping(self):
@@ -187,7 +246,7 @@ class ShimMappingTests(unittest.TestCase):
             "    ['grep', {pattern: 'x'}],"
             "    ['task', {description: 'y'}],"
             "  ];"
-            "  console.log(JSON.stringify(cases.map(([t, a]) => m.toEnvelope(t, a, dir))));"
+            "  console.log(JSON.stringify(cases.map(([t, a]) => m.toEnvelope(t, a, dir, 'session-a'))));"
             "});"
         )
         result = subprocess.run(["node", "--input-type=module", "-e", script],
@@ -200,7 +259,37 @@ class ShimMappingTests(unittest.TestCase):
         self.assertEqual(by_tool["run_command"]["args"], {"CommandLine": "rm x"})
         self.assertEqual(by_tool["grep_search"]["host"], "opencode")
         self.assertEqual(by_tool["task"]["tool"], "task")
+        self.assertEqual(envelopes[0]["conversation_id"], "session-a")
 
-
+    def test_after_hook_records_session_scoped_mutations_only(self):
+        if shutil.which("node") is None:
+            self.skipTest("node not available")
+        shim = ADAPTER / "plugin" / "gravitas.js"
+        with tempfile.TemporaryDirectory() as directory:
+            script = (
+                f"import({json.dumps(shim.as_uri())}).then(async m => {{"
+                f" const hooks = await m.GravitasPlugin({{directory:{json.dumps(directory)}}});"
+                " await hooks['tool.execute.after']({tool:'bash',sessionID:'session-a',"
+                " args:{command:'echo token=secret > a.py'}},{});"
+                " await hooks['tool.execute.after']({tool:'read',sessionID:'session-a',"
+                " args:{filePath:'a.py'}},{error:'read failed'});"
+                " await hooks['tool.execute.after']({tool:'write',sessionID:'session-b',"
+                " args:{filePath:'b.py'}},{});"
+                "});"
+            )
+            result = subprocess.run(
+                ["node", "--input-type=module", "-e", script],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            events = [
+                json.loads(line) for line in
+                (Path(directory) / ".gravitas" / "opencode-completions.jsonl")
+                .read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual([event["session_id"] for event in events],
+                             ["session-a", "session-b"])
+            self.assertTrue(events[0]["success"])
+            self.assertNotIn("secret", events[0]["args"]["command"])
 if __name__ == "__main__":
     unittest.main()

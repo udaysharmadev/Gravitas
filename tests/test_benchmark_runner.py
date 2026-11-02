@@ -1,12 +1,16 @@
 import importlib.util
+import hashlib
 import json
+import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).parents[1]
@@ -27,6 +31,8 @@ fixtures = load("fixtures", ROOT / "benchmarks/runner/fixtures.py")
 implementation = load("implementation", ROOT / "benchmarks/runner/implementation.py")
 compare = load("compare", ROOT / "benchmarks/runner/compare.py")
 audit = load("audit", ROOT / "benchmarks/runner/audit.py")
+metrics = load("metrics", ROOT / "benchmarks/runner/metrics.py")
+report = load("report", ROOT / "benchmarks/runner/report.py")
 
 
 class BenchmarkRunnerTests(unittest.TestCase):
@@ -119,6 +125,49 @@ class BenchmarkRunnerTests(unittest.TestCase):
             self.assertFalse((root / "tests" / "test_hidden_acceptance.py").exists())
             self.assertEqual(metadata["allowed_write_scope"], ["src/target.py"])
             self.assertEqual(len(metadata["hidden_validator_hash"]), 64)
+
+    def test_hidden_validator_worktree_is_private(self):
+        with tempfile.TemporaryDirectory() as directory:
+            worktree = implementation.create_private_worktree(
+                "BF-001", fallback_root=Path(directory) / ".gravitas" / "benchmark-worktrees"
+            )
+            self.addCleanup(shutil.rmtree, worktree)
+            if os.name != "nt":
+                self.assertEqual(stat.S_IMODE(worktree.stat().st_mode), 0o700)
+
+    def test_runner_cleans_worktree_if_fixture_materialization_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            worktree = Path(directory) / "episode"
+            worktree.mkdir()
+            with patch.object(implementation, "create_private_worktree", return_value=worktree):
+                with patch.object(implementation, "materialize", side_effect=OSError("fixture failure")):
+                    with self.assertRaisesRegex(OSError, "fixture failure"):
+                        implementation.run_episode(
+                            {"task_id": "BF-001"}, "model", "configuration"
+                        )
+            self.assertFalse(worktree.exists())
+
+    def test_report_export_scrubs_hidden_validator_output_only_from_copy(self):
+        hidden_text = "private hidden assertion detail"
+        episode = {"validator_outputs": [
+            {"criterion": "Hidden acceptance", "result": "FAIL", "output": hidden_text}
+        ]}
+        scrubbed = report.scrub_episode(episode)
+        self.assertIn(hidden_text, episode["validator_outputs"][0]["output"])
+        self.assertNotIn(hidden_text, json.dumps(scrubbed))
+        self.assertEqual(scrubbed["validator_outputs"][0]["result"], "FAIL")
+        self.assertEqual(
+            scrubbed["validator_outputs"][0]["output_sha256"],
+            hashlib.sha256(hidden_text.encode("utf-8")).hexdigest(),
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            report.write_report(
+                metrics.aggregate([]), [], directory, episodes=[episode]
+            )
+            export = (Path(directory) / "episodes.jsonl").read_text(encoding="utf-8")
+            self.assertNotIn(hidden_text, export)
+            self.assertIn('"output_redacted": true', export)
 
     def test_implementation_runner_denies_scope_escape(self):
         with tempfile.TemporaryDirectory() as directory:

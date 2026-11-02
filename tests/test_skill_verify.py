@@ -23,7 +23,6 @@ class PythonFallbackTests(unittest.TestCase):
     def test_python_fallback_uses_the_running_interpreter(self):
         command = verify.FALLBACK_CHAINS["python"]
         self.assertEqual(command, f'"{sys.executable}" -m pytest -q')
-        self.assertNotIn("python3", command)
 
         success, output = verify.run_verification(
             f'"{sys.executable}" -c "import sys; sys.exit(0)"'

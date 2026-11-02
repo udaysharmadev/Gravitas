@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 from impact_graph import build_impact_graph
+from evidence_chain import resolution_matches, verified_resolution_records
 from session_context import session_dir_for_payload
 from gravitas_evidence import criterion_states, is_fresh, owned_validator_pass
 
@@ -88,15 +89,30 @@ def update_state_from_evidence(state: dict, session_dir: Path) -> dict:
 
     failures_path = session_dir / "failures.jsonl"
     if failures_path.exists():
+        latest_by_fingerprint = {}
+        unkeyed = []
         failures = []
         for line in failures_path.read_text().splitlines():
             try:
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if entry.get("resolved") is not True:
-                failures.append(entry)
-        state["known_failures"] = failures
+            if not isinstance(entry, dict):
+                continue
+            failures.append(entry)
+        resolutions = {}
+        if any(entry.get("resolved") is True for entry in failures):
+            resolutions = verified_resolution_records(session_dir)
+        for entry in failures:
+            fingerprint = entry.get("fingerprint")
+            if fingerprint:
+                latest_by_fingerprint[fingerprint] = entry
+            elif not resolution_matches(entry, resolutions.get(entry.get("resolution_id"))):
+                unkeyed.append(entry)
+        state["known_failures"] = unkeyed + [
+            entry for entry in latest_by_fingerprint.values()
+            if not resolution_matches(entry, resolutions.get(entry.get("resolution_id")))
+        ]
 
     coverage = {identifier: info["status"]
                 for identifier, info in criterion_states(contract, entries).items()}

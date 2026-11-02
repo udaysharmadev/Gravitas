@@ -83,7 +83,7 @@ def cmd_report(args):
     meta = {"dataset": str(episodes_dir), "invalid_episodes": invalid,
             "models": f"{args.baseline} vs {args.treatment}"}
     report_path, csv_path = write_report(summary, comparisons, out, meta=meta,
-                                         publish=args.publish)
+                                         publish=args.publish, episodes=episodes)
     print(f"Wrote {report_path} and {csv_path}")
     return 0
 

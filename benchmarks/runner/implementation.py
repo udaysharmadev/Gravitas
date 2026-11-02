@@ -2,7 +2,9 @@
 """Constrained Gemini implementation episode runner for synthetic fixtures."""
 import argparse
 import json
+import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -100,8 +102,48 @@ def run_hidden_validation(worktree, task_id):
     return {"passed": result.returncode == 0, "output": output}
 
 
+def create_private_worktree(task_id, fallback_root=None):
+    """Create a per-episode directory private to the current user where supported."""
+    base = Path(tempfile.gettempdir())
+    try:
+        worktree = Path(tempfile.mkdtemp(prefix=f"gravitas-{task_id}-", dir=base))
+        if os.name != "nt":
+            os.chmod(worktree, 0o700)
+            if stat.S_IMODE(worktree.stat().st_mode) != 0o700:
+                raise OSError(f"could not secure temporary worktree permissions: {worktree}")
+        return worktree
+    except OSError:
+        if "worktree" in locals():
+            shutil.rmtree(worktree)
+        if fallback_root is None:
+            raise
+
+    fallback_root = Path(fallback_root)
+    fallback_root.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        os.chmod(fallback_root, 0o700)
+        if stat.S_IMODE(fallback_root.stat().st_mode) != 0o700:
+            raise OSError(f"could not secure fallback worktree root: {fallback_root}")
+    worktree = Path(tempfile.mkdtemp(prefix=f"gravitas-{task_id}-", dir=fallback_root))
+    if os.name != "nt":
+        os.chmod(worktree, 0o700)
+        if stat.S_IMODE(worktree.stat().st_mode) != 0o700:
+            shutil.rmtree(worktree)
+            raise OSError(f"could not secure fallback worktree: {worktree}")
+    return worktree
+
+
 def run_episode(task, model, configuration, max_steps=12):
-    worktree = Path(tempfile.mkdtemp(prefix=f"gravitas-{task['task_id']}-"))
+    worktree = create_private_worktree(
+        task["task_id"], fallback_root=ROOT / ".gravitas" / "benchmark-worktrees"
+    )
+    try:
+        return _run_episode_in_worktree(task, model, configuration, max_steps, worktree)
+    finally:
+        shutil.rmtree(worktree)
+
+
+def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
     fixture = materialize(task["task_id"], worktree)
     trajectory, tool_calls, tokens = [], [], {"input": 0, "output": 0, "total": 0, "cache_read": 0}
     last_result, scope_violation, error, final = "Begin by inspecting the fixture.", False, None, ""
@@ -139,8 +181,6 @@ def run_episode(task, model, configuration, max_steps=12):
         error = str(failure)
         validators = [{"criterion": "Agent protocol", "result": "FAIL", "output": error}]
         test_passed = False
-    finally:
-        shutil.rmtree(worktree, ignore_errors=True)
     solved = not error and test_passed and not scope_violation
     return {
         "task_id": task["task_id"], "task_lane": LANE_BY_TASK[task["task_id"]],

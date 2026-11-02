@@ -37,7 +37,7 @@ When resuming after interruption:
 4. Read evidence.jsonl -- understand what has been verified
 5. Read failures.jsonl -- do not retry listed approaches
 6. Resume from next_action in state.json
-7. Do NOT re-read files that state.json shows were already read and acted upon
+7. Re-read files that were targeted by a resolved failure before retrying completion.
 
 ## Failure Log: .gravitas/sessions/<task-id>/failures.jsonl
 
@@ -51,6 +51,26 @@ Before retrying anything, check this log.
 - Do not re-attempt approaches listed in failures.jsonl
 - Do not re-implement work shown complete in the evidence ledger
 - Do not start over from scratch if more than 50% of criteria are complete
+
+`gravitas resolve-failure` only permits the retry experiment; it does not
+clear the completion gate. Re-read the failed action's target after resolution
+and record fresh validator PASS evidence for any linked criteria before
+claiming completion. This is the enforcement companion to issue #57's
+recovery-documentation correction.
+
+## Anchor Upgrade (Backfill)
+
+Evidence ledgers written before user-local anchoring fail verification with
+"ledger head not anchored". On a ledger you trust, anchor its current head:
+
+```
+gravitas verify --backfill-anchors --session-dir .gravitas/sessions/<task-id>
+```
+
+Only backfill ledgers you trust — anchoring legitimizes whatever the head
+commits to. Legacy `resolved:true` failure markers without `resolution_id`
+stay unresolved by design; re-resolve them with
+`gravitas resolve-failure --session-dir … --fingerprint … --reason … --file … [--criterion-id …]`.
 
 ## Circuit Breaker
 

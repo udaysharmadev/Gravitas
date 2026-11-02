@@ -40,7 +40,7 @@
         "type": "object",
         "properties": {
           "id": { "type": "string", "pattern": "^VAL-\\d{3}$" },
-          "command": { "type": "string" }
+          "command": { "type": "array", "minItems": 1, "items": { "type": "string" } }
         },
         "required": ["id", "command"]
       }

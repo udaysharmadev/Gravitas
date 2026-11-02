@@ -83,7 +83,7 @@ Prior fixes verified present: PR #1 (shell injection), PR #2 squash 297a613 (unp
 
 ## Remaining limitations (honest)
 - Shell classifier is not filesystem containment; quoted-separator splitting is regex-based (fail-closed noisy, e.g. `echo "a;b"` → mutation); heredoc bodies mis-split safe-side. OS/host isolation still required for true containment.
-- Hash chains are tamper-evident, not tamper-proof against full-ledger rewrite.
+- User-local anchors detect project-ledger rewrites only while the anchor directory remains outside the attacker-controlled write scope; they do not resist a same-user process that can rewrite both locations.
 - Scope gating covers enumerable paths only; TOCTOU races documented in policy.
 - Opencode read-before-write ledger is per-call (`reads=set()`); existing-file writes via shim deny until session read-tracking exists — surfaced as explicit reason.
 - No breaking changes; no version bump; "V5" remains upgrade direction, not a release designation.
@@ -97,7 +97,7 @@ Prior fixes verified present: PR #1 (shell injection), PR #2 squash 297a613 (unp
 
 ## Implemented
 - C1 `decide()`: high-stakes flags (destructive/security/auth/migration/broad_fanout) now override the trivial/read_only fast-path (`{trivial,destructive}` → deep, was direct); all count signals coerced via `_safe_int` (garbage strings → defaults, no traceback). Plain trivial/read_only still direct. Tests: DecideBorderlineTests.
-- C3 recovery: `pre_tool` honors `resolved:true` markers (aligned with stop_gate/post_invocation/resume); new `gravitas resolve-failure --session-dir --fingerprint --reason` appends a marker, keeping the original record. Previously the exact-fingerprint ban was permanent with no recovery path. Tests: ban → resolve → allow; unresolved still bans.
+- C3 recovery: `pre_tool` honors `resolved:true` markers (aligned with stop_gate/post_invocation/resume); new `gravitas resolve-failure --session-dir … --fingerprint … --reason … --file … [--criterion-id …]` appends a marker, keeping the original record. Previously the exact-fingerprint ban was permanent with no recovery path. Tests: ban → resolve → allow; unresolved still bans.
 - C2 measured, no change: `build_index` 200-file synthetic repo 0.22s, this repo (102 files) 0.53s; refresh/drop/add covered by existing RepoGraphTests. No caching added (correctness over marginal speed).
 - C4 verified, no change: coordinator retired to conditional delegation; agent roles conditional with quota justification; no host claims native subagents falsely (OpenCode agent frontmatter uses host `mode: subagent`, fixture-pinned).
 - C5 verified, no change: conversation isolation pinned by existing test; sessions are separate directories by construction.

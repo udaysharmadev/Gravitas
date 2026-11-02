@@ -9,6 +9,8 @@ disclosure block, and no comparative-superiority language.  Infrastructure
 failures are always reported as INVALID counts, never silently dropped.
 """
 import csv
+import copy
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -159,12 +161,31 @@ def write_summary_csv(summary, path):
     return path
 
 
-def write_report(summary, comparisons, output_dir, meta=None, publish=False):
-    """Write report.md and summary.csv into output_dir; returns their paths."""
+def scrub_episode(episode):
+    """Return a publication-safe copy without hidden-validator output text."""
+    scrubbed = copy.deepcopy(episode)
+    for validator in scrubbed.get("validator_outputs", []):
+        if not isinstance(validator, dict) or "output" not in validator:
+            continue
+        output = validator.pop("output")
+        if isinstance(output, str):
+            validator["output_sha256"] = hashlib.sha256(output.encode("utf-8")).hexdigest()
+        validator["output_redacted"] = True
+    return scrubbed
+
+
+def write_report(summary, comparisons, output_dir, meta=None, publish=False, episodes=None):
+    """Write report artifacts and sanitized episode exports into output_dir."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     markdown = render_markdown(summary, comparisons, meta=meta, publish=publish)
     report_path = output_dir / "report.md"
     report_path.write_text(markdown)
     csv_path = write_summary_csv(summary, output_dir / "summary.csv")
+    if episodes is not None:
+        export_path = output_dir / "episodes.jsonl"
+        export_path.write_text("".join(
+            json.dumps(scrub_episode(episode), sort_keys=True) + "\n"
+            for episode in episodes
+        ), encoding="utf-8")
     return report_path, csv_path

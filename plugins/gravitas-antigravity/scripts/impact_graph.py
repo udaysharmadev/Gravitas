@@ -15,17 +15,31 @@ from gravitas_repo import context_for, get_index
 
 
 def _normalize_changed(root: Path, changed: str) -> str | None:
-    candidate = Path(changed)
-    if candidate.is_absolute():
-        try:
-            relative = str(candidate.resolve().relative_to(root))
-        except ValueError:
-            return None
-    else:
-        relative = changed
+    # Resolve both forms against the real root so "..", symlink, and absolute
+    # escapes are all rejected the same way before the path becomes a graph key.
+    root = root.resolve()
+    candidate = Path(changed.replace("\\", "/"))
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    try:
+        relative = candidate.resolve().relative_to(root)
+    except ValueError:
+        return None
     if (root / relative).is_file():
-        return relative
+        return relative.as_posix()
     return None
+
+
+def _escapes_root(root: Path, changed: str) -> bool:
+    """True when ``changed`` resolves outside ``root`` (``..``, symlink, absolute)."""
+    candidate = Path(changed)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    try:
+        candidate.resolve().relative_to(root.resolve())
+    except ValueError:
+        return True
+    return False
 
 
 def related_files(root: Path, changed: str) -> dict:
@@ -50,7 +64,13 @@ def build_impact_graph(root: Path, changed_files: list[str]) -> tuple[dict, list
     root = root.resolve()
     graph = {}
     for changed in sorted(set(changed_files)):
-        relative = _normalize_changed(root, changed) or changed
+        relative = _normalize_changed(root, changed)
+        if relative is None:
+            # Keep entries for in-root paths that no longer exist (deleted
+            # files), but never let an out-of-root path become a graph key.
+            if _escapes_root(root, changed):
+                continue
+            relative = changed
         graph[relative] = related_files(root, changed)
     targets = sorted({target for related in graph.values()
                       for target in related["tests"] + related["config"]})
