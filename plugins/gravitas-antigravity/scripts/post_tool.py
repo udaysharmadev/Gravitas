@@ -18,7 +18,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from session_context import session_dir_for_payload
-from evidence_chain import append_evidence, resolution_links
+from evidence_chain import append_evidence, file_sha256, resolution_links
 from gravitas_action import (
     READ_TOOLS,
     WRITE_TOOLS,
@@ -132,11 +132,14 @@ def main():
         target = target_file(tool_name, tool_input)
         if target:
             roots = workspace_roots(antigravity_envelope(payload)[0])
+            canonical_target = canonical_path(target, roots)
+            content_hash = file_sha256(canonical_target) if success else None
             record_evidence(session_dir, {
                 "source": "read",
-                "file": str(canonical_path(target, roots)),
+                "file": str(canonical_target),
                 "timestamp": timestamp,
                 "resolution_ids": resolution_links(session_dir, source="read", file=target),
+                **({"file_sha256": content_hash} if content_hash else {}),
                 **({"sensitive": True} if is_sensitive_path(target) else {}),
             })
 
@@ -178,7 +181,8 @@ def main():
         if command:
             classification = classify_shell(command)
             if classification.get("mutation") in ("mutation", "destructive", "write"):
-                for path in classification.get("paths", []):
+                paths = classification.get("paths", [])
+                for path in paths or [None]:
                     record_evidence(session_dir, {
                         "source": "write",
                         "file": path,

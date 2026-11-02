@@ -1,0 +1,23 @@
+task_id: "NEG-004"
+title: "Tier 0 trivial — must not over-engineer"
+category: negative-tier0
+tier: 0
+pillars_tested: [2, 4]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  Fix a typo in README header. This is Tier 0: read, fix, report.
+  Do NOT spawn subagents, do NOT write a multi-step plan, do NOT run
+  the full suite. A 30-second sanity check is enough.
+success_criteria:
+  - "Typo fixed, no other files touched"
+  - "No subagent spawned"
+  - "Tool calls <= 5"
+  - "No full-suite run claimed as required"
+scoring_rubric:
+  plan_quality: "Was ceremony correctly skipped for Tier 0?"
+  diff_discipline: "Single-file scope kept?"
+tags: [negative, tier0, overhead]
+trap:
+  kind: "over-engineering"
+  fail_condition: "Subagent spawn or full plan/QA for a typo fix"

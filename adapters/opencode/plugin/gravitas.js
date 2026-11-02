@@ -34,6 +34,7 @@ import { appendFileSync, chmodSync, lstatSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const MUTATING_TOOLS = new Set(["bash", "edit", "write", "patch"]);
+const READ_EVIDENCE_TOOLS = new Set(["read"]);
 const COMPLETION_TOOLS = new Set(["bash", "edit", "write", "patch"]);
 
 function hasMutatingArgs(tool, args) {
@@ -86,7 +87,7 @@ export function toEnvelope(tool, args, directory, sessionID = "") {
   return envelope;
 }
 
-function decide(directory, tool, args, sessionID) {
+function decide(directory, tool, args, sessionID = "") {
   const envelope = toEnvelope(tool, args, directory, sessionID);
   let raw;
   try {
@@ -114,6 +115,35 @@ function decide(directory, tool, args, sessionID) {
     return { decision: "deny", reason };
   }
   return verdict;
+}
+
+function recordOpencodeRead(directory, sessionID, file, succeeded) {
+  if (!directory || !file) return;
+  if (!succeeded) return; // failed reads must never authorize later writes
+  if (typeof sessionID !== "string" || !sessionID) {
+    console.error("[gravitas] cannot record read without a session id (fail-closed: no read evidence stored)");
+    return;
+  }
+  try {
+    mkdirSync(join(directory, ".gravitas"), { recursive: true });
+    appendFileSync(
+      join(directory, ".gravitas", "opencode-reads.jsonl"),
+      JSON.stringify({ session: String(sessionID || ""), file: String(file), source: "read" }) + "\n"
+    );
+  } catch {
+    // Telemetry must never block the tool call; the guard stays fail-closed
+    // on its own path and simply sees no recorded read.
+  }
+}
+
+function readTargetFor(tool, normalizedEnvelope) {
+  if (tool !== "read") return "";
+  return normalizedEnvelope?.args?.AbsolutePath || "";
+}
+
+function readSucceeded(output) {
+  if (!output || typeof output !== "object") return false;
+  return output.success !== false && !output.error;
 }
 
 function completionArgs(tool, args) {
@@ -174,6 +204,7 @@ export const GravitasPlugin = async ({ directory }) => {
   return {
     "tool.execute.before": async (input, output) => {
       const tool = input?.tool;
+      const sessionID = input?.sessionID || input?.sessionId || "";
       const args = output?.args ?? {};
       if (typeof tool !== "string" || !tool) {
         throw new Error("Gravitas denied call: missing tool name in hook input");
@@ -183,7 +214,6 @@ export const GravitasPlugin = async ({ directory }) => {
           `Gravitas denied ${tool}: mutating tool called with missing arguments (fail-closed)`
         );
       }
-      const sessionID = input?.sessionID || input?.sessionId || "";
       const verdict = decide(directory, tool, args, sessionID);
       if (verdict && verdict.decision === "deny") {
         throw new Error(`Gravitas denied ${tool}: ${verdict.reason || "policy decision"}`);
@@ -193,8 +223,17 @@ export const GravitasPlugin = async ({ directory }) => {
           `[gravitas] prior validator evidence is stale for: ${verdict.stale_validator_criteria.join(", ")}`
         );
       }
+      // Read evidence is recorded only in tool.execute.after on success:
+      // recording in .before would authorize writes for reads that then fail.
     },
     "tool.execute.after": async (input, output) => {
+      const tool = input?.tool;
+      const sessionID = input?.sessionID || input?.sessionId || "";
+      const args = output?.args ?? {};
+      if (typeof tool === "string" && READ_EVIDENCE_TOOLS.has(tool)) {
+        const target = readTargetFor(tool, toEnvelope(tool, args, directory, sessionID));
+        recordOpencodeRead(directory, sessionID, target, readSucceeded(output));
+      }
       recordCompletion(directory, input, output);
     },
   };

@@ -261,9 +261,12 @@ class ReproRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return self.cwd / ".gravitas/sessions/t"
 
-    def repro(self, session, criterion, phase, *cmd, unreproducible=False, reason=""):
+    def repro(self, session, criterion, phase, *cmd, unreproducible=False, reason="",
+              reproducer_id=None, cwd="."):
         args = ["--session-dir", str(session), "--criterion-id", criterion,
-                "--phase", phase]
+                "--phase", phase, "--cwd", cwd]
+        if reproducer_id:
+            args += ["--reproducer-id", reproducer_id]
         if unreproducible:
             args += ["--unreproducible", "--reason", reason]
         else:
@@ -271,17 +274,75 @@ class ReproRunnerTests(unittest.TestCase):
         return test_runtime.run_script("repro_runner.py", None, *args, cwd=self.cwd)
 
     def test_fail_before_pass_after_pair(self):
-        session = self.init({"mode": "debug", "objective": "fix it",
-                             "acceptance_criteria": [{"id": "AC-1", "statement": "fixed"}]})
-        failing = self.repro(session, "AC-1", "before", sys.executable, "-c",
-                             "raise SystemExit(1)")
+        code = "from pathlib import Path; raise SystemExit(0 if Path('fixed').exists() else 1)"
+        command = [sys.executable, "-c", code]
+        session = self.init({
+            "mode": "debug", "objective": "fix it",
+            "acceptance_criteria": [{"id": "AC-1", "statement": "fixed"}],
+            "reproducers": [{"id": "repro-1", "command": command, "criterion_ids": ["AC-1"]}],
+        })
+        failing = self.repro(session, "AC-1", "before", *command, reproducer_id="repro-1")
         self.assertNotEqual(failing.returncode, 0)
-        passing = self.repro(session, "AC-1", "after", sys.executable, "-c", "pass")
+        (self.cwd / "fixed").write_text("fixed")
+        passing = self.repro(session, "AC-1", "after", *command, reproducer_id="repro-1")
         self.assertEqual(passing.returncode, 0, passing.stderr)
         entries = [json.loads(line) for line in (session / "evidence.jsonl").read_text().splitlines()]
         repro = [e for e in entries if e.get("source") == "reproducer"]
         self.assertEqual([(e["phase"], e["verdict"]) for e in repro],
                          [("before", "FAIL"), ("after", "PASS")])
+
+    def test_after_reproducer_rejects_changed_command(self):
+        session = self.init({"mode": "debug", "objective": "fix it",
+                             "acceptance_criteria": [{"id": "AC-1", "statement": "fixed"}]})
+        before = self.repro(session, "AC-1", "before", sys.executable, "-c", "raise SystemExit(1)")
+        self.assertNotEqual(before.returncode, 0, before.stderr)
+        after = self.repro(session, "AC-1", "after", sys.executable, "-c", "pass")
+        self.assertNotEqual(after.returncode, 0)
+        self.assertIn("after command does not match", after.stderr)
+
+    def test_after_reproducer_rejects_changed_working_directory(self):
+        session = self.init({"mode": "debug", "objective": "fix it",
+                             "acceptance_criteria": [{"id": "AC-1", "statement": "fixed"}]})
+        command = [sys.executable, "-c", "raise SystemExit(1)"]
+        before = self.repro(session, "AC-1", "before", *command)
+        self.assertNotEqual(before.returncode, 0)
+        (self.cwd / "nested").mkdir()
+        after = self.repro(session, "AC-1", "after", *command, cwd="nested")
+        self.assertNotEqual(after.returncode, 0)
+        self.assertIn("working directory does not match", after.stderr)
+
+    def test_after_reproducer_rejects_passing_before_run(self):
+        session = self.init({"mode": "debug", "objective": "fix it",
+                             "acceptance_criteria": [{"id": "AC-1", "statement": "fixed"}]})
+        command = [sys.executable, "-c", "pass"]
+        before = self.repro(session, "AC-1", "before", *command)
+        self.assertEqual(before.returncode, 0, before.stderr)
+        after = self.repro(session, "AC-1", "after", *command)
+        self.assertNotEqual(after.returncode, 0)
+        self.assertIn("before reproducer must have a FAIL verdict", after.stderr)
+
+    def test_after_reproducer_rejects_unverifiable_before_run(self):
+        session = self.init({"mode": "debug", "objective": "fix it",
+                             "acceptance_criteria": [{"id": "AC-1", "statement": "fixed"}]})
+        before = self.repro(
+            session, "AC-1", "before", unreproducible=True, reason="test precondition unavailable"
+        )
+        self.assertEqual(before.returncode, 0, before.stderr)
+        after = self.repro(session, "AC-1", "after", sys.executable, "-c", "pass")
+        self.assertNotEqual(after.returncode, 0)
+        self.assertIn("before reproducer must have a FAIL verdict", after.stderr)
+
+    def test_declared_reproducer_rejects_unregistered_command(self):
+        command = [sys.executable, "-c", "pass"]
+        session = self.init({
+            "mode": "debug", "objective": "fix it",
+            "acceptance_criteria": [{"id": "AC-1", "statement": "fixed"}],
+            "reproducers": [{"id": "repro-1", "command": command, "criterion_ids": ["AC-1"]}],
+        })
+        result = self.repro(session, "AC-1", "before", sys.executable, "-c", "print('other')",
+                            reproducer_id="repro-1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("differs from the declared reproducer", result.stderr)
 
     def test_undeclared_criterion_rejected(self):
         session = self.init({"mode": "debug", "objective": "x",

@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 from gravitas_action import antigravity_envelope, canonical_path, workspace_roots
-from evidence_chain import resolution_matches, verified_resolution_records
+from evidence_chain import file_sha256, resolution_matches, verified_resolution_records
 from gravitas_policy import (
     MODE_ALIASES,
     MODES,
@@ -75,22 +75,27 @@ def active_failures(failures: list, resolutions: dict) -> list:
 
 
 def load_reads(session_dir: Path) -> set:
-    """Load set of files read this session from evidence ledger."""
-    reads = set()
+    """Load reads whose current content still matches the recorded snapshot."""
+    recorded_reads = {}
     evidence_path = session_dir / "evidence.jsonl"
     if not evidence_path.exists():
-        return reads
+        return set()
     with open(evidence_path) as f:
         for line in f:
             line = line.strip()
             if line:
                 try:
                     entry = json.loads(line)
-                    if entry.get("source") == "read" and entry.get("file"):
-                        reads.add(entry["file"])
+                    if entry.get("source") == "read" and isinstance(entry.get("file"), str):
+                        recorded_hash = entry.get("file_sha256")
+                        if isinstance(recorded_hash, str):
+                            recorded_reads[entry["file"]] = recorded_hash
                 except json.JSONDecodeError:
                     pass
-    return reads
+    return {
+        path for path, recorded_hash in recorded_reads.items()
+        if file_sha256(Path(path)) == recorded_hash
+    }
 
 
 def deny(reason: str):

@@ -81,6 +81,21 @@
       "default": [],
       "description": "Named validators for Gravitas-owned execution. Completion accepts only their captured exit-code records."
     },
+    "reproducers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "command", "criterion_ids"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+          "command": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "criterion_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+        },
+        "additionalProperties": false
+      },
+      "default": [],
+      "description": "Declared argv for reproducer runs. Gravitas requires matching before/after command hashes."
+    },
     "task_id": {
       "type": "string",
       "description": "Optional unique ID for session ledger path. Auto-generated if not provided."

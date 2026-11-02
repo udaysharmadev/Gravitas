@@ -10,6 +10,8 @@ from pathlib import Path
 def valid_pairs(episodes, baseline, treatment):
     indexed = {}
     for episode in episodes:
+        if not isinstance(episode, dict):
+            continue
         if not episode.get("infrastructure_failure") and episode.get("configuration") in {baseline, treatment}:
             indexed.setdefault((episode["task_id"], episode.get("run_index", 1)), {})[episode["configuration"]] = episode
     return [pair for pair in indexed.values() if baseline in pair and treatment in pair]
@@ -61,7 +63,12 @@ def main():
     parser.add_argument("--treatment", required=True)
     parser.add_argument("--output")
     args = parser.parse_args()
-    episodes = [json.loads(path.read_text()) for path in sorted(Path(args.episodes).glob("*.json"))]
+    episodes = []
+    for path in sorted(Path(args.episodes).glob("*.json")):
+        payload = json.loads(path.read_text())
+        if isinstance(payload, list):
+            continue
+        episodes.append(payload)
     result = json.dumps(compare(episodes, args.baseline, args.treatment), indent=2)
     if args.output:
         Path(args.output).write_text(result + "\n")

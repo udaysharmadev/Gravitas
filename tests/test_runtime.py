@@ -134,7 +134,10 @@ class RuntimeTests(unittest.TestCase):
         session = self.init({"mode": "implement", "objective": "x"})
         target = self.cwd / "existing.py"
         target.write_text("x = 1\n")
-        (session / "evidence.jsonl").write_text(json.dumps({"source": "read", "file": str(target)}) + "\n")
+        (session / "evidence.jsonl").write_text(json.dumps({
+            "source": "read", "file": str(target),
+            "file_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
+        }) + "\n")
         existing = run_script("pre_tool.py", {"tool_name": "write_to_file", "tool_input": {"TargetFile": "existing.py"}}, cwd=self.cwd)
         new = run_script("pre_tool.py", {"tool_name": "write_to_file", "tool_input": {"TargetFile": "new.py"}}, cwd=self.cwd)
         self.assertEqual(json.loads(existing.stdout)["decision"], "allow")
@@ -229,7 +232,7 @@ class RuntimeTests(unittest.TestCase):
             }
             res = run_script("post_tool.py", payload, cwd=self.cwd)
             self.assertEqual(json.loads(res.stdout), {})
-        for cmd in ("ls", "git status"):
+        for cmd in ("ls", "git status", "echo hi"):
             payload = {
                 "toolCall": {"name": "run_command", "args": {"CommandLine": cmd}},
                 "success": True,
@@ -270,6 +273,33 @@ class RuntimeTests(unittest.TestCase):
         gate_after = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
         self.assertEqual(gate_after["decision"], "continue")
         self.assertIn("acceptance criteria have no verification evidence", gate_after["reason"])
+
+    def test_unknown_shell_write_invalidates_prior_validator_pass(self):
+        session = self.init({
+            "mode": "implement", "objective": "x",
+            "acceptance_criteria": [{"id": "tests", "statement": "tests pass", "validators": ["unit"]}],
+            "validators": [{"id": "unit", "command": [sys.executable, "-c", "pass"], "criterion_ids": ["tests"]}],
+        })
+        result = run_script(
+            "validator_runner.py", None, "--session-dir", str(session), "--validator-id", "unit",
+            "--criterion-id", "tests", "--", sys.executable, "-c", "pass", cwd=self.cwd,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        command = "python -c \"open('a.py', 'w').write('x')\""
+        result = run_script(
+            "post_tool.py",
+            {"toolCall": {"name": "run_command", "args": {"CommandLine": command}},
+             "success": True},
+            cwd=self.cwd,
+        )
+        self.assertEqual(json.loads(result.stdout), {})
+        entries = [json.loads(line) for line in (session / "evidence.jsonl").read_text().splitlines()]
+        unknown_write = next(entry for entry in entries if entry.get("source") == "write")
+        self.assertIsNone(unknown_write["file"])
+        schema = json.loads((ROOT / "schemas/evidence.schema.json").read_text())
+        Draft7Validator(schema).validate(unknown_write)
+        gate = json.loads(run_script("stop_gate.py", {}, cwd=self.cwd).stdout)
+        self.assertNotEqual(gate["decision"], "allow")
 
     def test_stop_gate_rejects_forged_validator_command(self):
         declared_command = [sys.executable, "-c", "pass"]
@@ -346,7 +376,10 @@ class RuntimeTests(unittest.TestCase):
         second = self.init({"mode": "implement", "objective": "second"}, task_id="second", conversation_id="conversation-b")
         target = self.cwd / "existing.py"
         target.write_text("VALUE = 1\n")
-        (first / "evidence.jsonl").write_text(json.dumps({"source": "read", "file": str(target)}) + "\n")
+        (first / "evidence.jsonl").write_text(json.dumps({
+            "source": "read", "file": str(target),
+            "file_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
+        }) + "\n")
         first_payload = {"conversationId": "conversation-a", "toolCall": {"name": "write_to_file", "args": {"TargetFile": "existing.py"}}}
         second_payload = {"conversationId": "conversation-b", "toolCall": {"name": "write_to_file", "args": {"TargetFile": "existing.py"}}}
         self.assertEqual(json.loads(run_script("pre_tool.py", first_payload, cwd=self.cwd).stdout)["decision"], "allow")

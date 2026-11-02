@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GravitasBench Runner Episode",
+  "type": "object",
+  "required": [
+    "task_id",
+    "configuration",
+    "validator_outputs",
+    "claimed_success",
+    "functional_solve",
+    "false_completion",
+    "infrastructure_failure"
+  ],
+  "properties": {
+    "task_id": {"type": "string", "minLength": 1},
+    "configuration": {"type": "string", "minLength": 1},
+    "validator_outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["result"],
+        "properties": {
+          "result": {"type": "string", "enum": ["PASS", "FAIL", "INVALID"]}
+        },
+        "additionalProperties": true
+      }
+    },
+    "claimed_success": {"type": "boolean"},
+    "functional_solve": {"type": "boolean"},
+    "false_completion": {"type": "boolean"},
+    "infrastructure_failure": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

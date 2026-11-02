@@ -33,23 +33,168 @@ compare = load("compare", ROOT / "benchmarks/runner/compare.py")
 audit = load("audit", ROOT / "benchmarks/runner/audit.py")
 metrics = load("metrics", ROOT / "benchmarks/runner/metrics.py")
 report = load("report", ROOT / "benchmarks/runner/report.py")
+benchmark_cli = load("benchmark_cli", ROOT / "benchmarks/cli.py")
 
 
 class BenchmarkRunnerTests(unittest.TestCase):
+    def write_valid_episode(self, episodes):
+        task = {
+            "task_id": "PL-001", "commit": "fixture", "title": "Plan",
+            "description": "Investigate.", "success_criteria": ["Return a plan"],
+        }
+        episode = run.build_episode(
+            task, "gemini-3.8-flash", "smoke", "1. Inspect\n2. Verify", {"total": 12}, 0.1,
+        )
+        (episodes / "valid.json").write_text(json.dumps(episode))
+
     def test_validator_rejects_false_derived_truth(self):
-        schema = json.loads((ROOT / "schemas/episode.schema.json").read_text())
+        schema = json.loads((ROOT / "benchmarks/runner/episode.schema.json").read_text())
         episode = {
             "task_id": "t", "repo_commit": "abc", "model": "m", "configuration": "c",
             "validator_outputs": [{"criterion": "AC1", "result": "FAIL"}],
             "claimed_success": True, "functional_solve": True, "false_completion": False,
+            "infrastructure_failure": False,
         }
-        self.assertIn("functional_solve must be False from validator outputs", validate.episode_errors(episode, schema))
+        self.assertIn(
+            "functional_solve must be False from validator outputs",
+            validate.episode_errors(episode, schema),
+        )
+
+    def test_validator_rejects_non_string_validator_result(self):
+        episode = {
+            "task_id": "t", "configuration": "c",
+            "validator_outputs": [{"result": ["PASS"]}],
+            "claimed_success": False, "functional_solve": False,
+            "false_completion": False, "infrastructure_failure": False,
+        }
+        errors = validate.episode_errors(episode, {})
+        self.assertIn(
+            "validator_outputs[0].result must be PASS, FAIL, or INVALID",
+            errors,
+        )
+
+    def test_report_rejects_contradictory_episode_before_aggregation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            episodes = Path(directory) / "episodes"
+            output = Path(directory) / "report"
+            episodes.mkdir()
+            (episodes / "forged.json").write_text(json.dumps({
+                "task_id": "BF-001",
+                "configuration": "test",
+                "validator_outputs": [{"result": "FAIL"}],
+                "claimed_success": True,
+                "functional_solve": True,
+                "false_completion": False,
+                "infrastructure_failure": False,
+            }))
+            result = benchmark_cli.main([
+                "report", "--episodes", str(episodes), "--out", str(output),
+            ])
+            self.assertEqual(result, 2)
+            self.assertFalse((output / "report.md").exists())
+
+    def test_report_rejects_array_episode_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            episodes = Path(directory) / "episodes"
+            output = Path(directory) / "report"
+            episodes.mkdir()
+            self.write_valid_episode(episodes)
+            (episodes / "aggregate.json").write_text(json.dumps([{"task_id": "valid-looking"}]))
+            result = benchmark_cli.main([
+                "report", "--episodes", str(episodes), "--out", str(output),
+            ])
+            self.assertEqual(result, 2)
+            self.assertFalse((output / "report.md").exists())
+
+    def test_report_rejects_malformed_json_episode_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            episodes = Path(directory) / "episodes"
+            output = Path(directory) / "report"
+            episodes.mkdir()
+            self.write_valid_episode(episodes)
+            (episodes / "broken.json").write_text("{not-json")
+            result = benchmark_cli.main([
+                "report", "--episodes", str(episodes), "--out", str(output),
+            ])
+            self.assertEqual(result, 2)
+            self.assertFalse((output / "report.md").exists())
+
+    def test_report_rejects_schema_invalid_episode_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            episodes = Path(directory) / "episodes"
+            output = Path(directory) / "report"
+            episodes.mkdir()
+            self.write_valid_episode(episodes)
+            (episodes / "missing-fields.json").write_text(json.dumps({"task_id": "missing"}))
+            result = benchmark_cli.main([
+                "report", "--episodes", str(episodes), "--out", str(output),
+            ])
+            self.assertEqual(result, 2)
+            self.assertFalse((output / "report.md").exists())
+
+    def test_report_accepts_valid_generated_episode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            episodes = Path(directory) / "episodes"
+            output = Path(directory) / "report"
+            episodes.mkdir()
+            self.write_valid_episode(episodes)
+            result = benchmark_cli.main([
+                "report", "--episodes", str(episodes), "--out", str(output),
+            ])
+            self.assertEqual(result, 0)
+            self.assertTrue((output / "report.md").is_file())
 
     def test_validator_rejects_aggregate_artifact_cleanly(self):
         self.assertEqual(
             validate.episode_errors([], {}, None),
             ["episode must be a JSON object; aggregate arrays are not episode files"],
         )
+
+    def test_validate_episodes_requires_schema(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ValueError):
+                validate.validate_episodes(directory)
+
+    def test_report_rejects_contradictory_episode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            episodes_dir = root / "episodes"
+            episodes_dir.mkdir()
+            episode = {
+                "task_id": "t", "repo_commit": "abc", "configuration": "c",
+                "validator_outputs": [{"criterion": "AC1", "result": "FAIL"}],
+                "claimed_success": True, "functional_solve": True,
+                "false_completion": False,
+            }
+            (episodes_dir / "episode.json").write_text(
+                json.dumps(episode), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "benchmarks/cli.py"), "report",
+                 "--episodes", str(episodes_dir), "--out", str(root / "report")],
+                cwd=ROOT, capture_output=True, text=True, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Episode validation failed", result.stderr)
+
+    def test_report_rejects_empty_episodes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            episodes_dir = root / "episodes"
+            episodes_dir.mkdir()
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "benchmarks/cli.py"), "report",
+                 "--episodes", str(episodes_dir), "--out", str(root / "report")],
+                cwd=ROOT, capture_output=True, text=True, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Episode validation failed", result.stderr)
+
+    def test_compare_skips_aggregate_artifacts(self):
+        episodes = [
+            [{"task_id": "A", "configuration": "base"}],
+            {"task_id": "A", "configuration": "base", "functional_solve": False},
+            {"task_id": "A", "configuration": "treated", "functional_solve": True},
+        ]
+        result = compare.compare(episodes, "base", "treated")
+        self.assertEqual(result["paired_episodes"], 1)
 
     def test_validator_allows_empty_directory_only_when_requested(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -96,14 +241,15 @@ class BenchmarkRunnerTests(unittest.TestCase):
         self.assertEqual(episode["validator_outputs"][0]["result"], "INVALID")
         self.assertNotIn("AQ.", json.dumps(episode))
 
-    def test_manifest_registers_thirty_unique_task_specs(self):
+    def test_manifest_registers_unique_task_specs(self):
         manifest = (ROOT / "benchmarks/manifest.yaml").read_text()
         lanes = re.findall(r"^  L\d+:.*?^    tasks: \[([^]]*)\]", manifest, re.MULTILINE | re.DOTALL)
         task_ids = [task_id.strip() for lane in lanes for task_id in lane.split(",") if task_id.strip()]
         specs = {path.stem for path in (ROOT / "eval/tasks").glob("*.yaml")}
+        expected = int(re.search(r"^  task_count: (\d+)", manifest, re.MULTILINE).group(1))
         self.assertEqual(len(lanes), 10)
-        self.assertEqual(len(task_ids), 30)
-        self.assertEqual(len(set(task_ids)), 30)
+        self.assertEqual(len(task_ids), expected)
+        self.assertEqual(len(set(task_ids)), expected)
         self.assertFalse(set(task_ids) - specs)
 
     def test_fixture_withholds_acceptance_and_starts_failing(self):
@@ -247,7 +393,11 @@ class BenchmarkRunnerTests(unittest.TestCase):
                  "--out", str(Path(directory) / "corpus")],
                 text=True, capture_output=True, cwd=ROOT, check=False)
             self.assertEqual(build.returncode, 0, build.stderr)
-            self.assertEqual(json.loads(build.stdout)["built"], 30)
+            import yaml
+            expected = len([t for lane in yaml.safe_load(
+                (ROOT / "benchmarks/manifest.yaml").read_text())["lanes"].values()
+                for t in lane.get("tasks", [])])
+            self.assertEqual(json.loads(build.stdout)["built"], expected)
 
     def test_hidden_test_deterministic_per_task(self):
         self.assertEqual(fixtures.hidden_test_source("BF-001"),
@@ -255,6 +405,47 @@ class BenchmarkRunnerTests(unittest.TestCase):
         self.assertNotEqual(fixtures.hidden_test_source("BF-001"),
                             fixtures.hidden_test_source("BF-002"))
         self.assertEqual(len(fixtures.hidden_test_hash("BF-001")), 64)
+
+    def test_step_limit_with_passing_hidden_is_not_a_solve(self):
+        outcome = load("outcome", ROOT / "benchmarks/runner/outcome.py")
+        derived = outcome.derive_outcome(
+            tests_passing=True, finished_normally=False,
+            scope_ok=True, infrastructure_failure=False,
+        )
+        self.assertFalse(derived["functional_solve"])
+        validators = [
+            {"criterion": "Hidden acceptance", "result": "PASS"},
+            {"criterion": "Allowed write scope", "result": "PASS"},
+            {"criterion": "Episode finished within step budget", "result": "FAIL"},
+        ]
+        expected = outcome.expected_derived_fields(validators, claimed_success=False)
+        self.assertFalse(expected["functional_solve"])
+        self.assertFalse(expected["false_completion"])
+        self.assertFalse(expected["infrastructure_failure"])
+        episode = {
+            "task_id": "BF-001", "configuration": "c",
+            "validator_outputs": validators,
+            "claimed_success": False, "functional_solve": False,
+            "false_completion": False, "infrastructure_failure": False,
+            "outcome": derived,
+        }
+        self.assertEqual(validate.episode_errors(episode, {}), [])
+
+    def test_implementation_step_limit_episode_validates(self):
+        task = {"task_id": "BF-001", "commit": "fixture", "description": "Fix."}
+        action = '{"tool": "read", "path": "src/target.py"}'
+        with patch.object(implementation, "api_key", return_value="key"), \
+             patch.object(implementation, "generate_content", return_value=(action, {})), \
+             patch.object(implementation, "run_hidden_validation",
+                          return_value={"passed": True, "output": "hidden ok"}):
+            episode = implementation.run_episode(task, "model", "configuration", max_steps=2)
+        self.assertFalse(episode["functional_solve"])
+        self.assertIn("outcome", episode)
+        self.assertFalse(episode["outcome"]["finished_normally"])
+        self.assertTrue(episode["outcome"]["tests_passing"])
+        criteria = {v["criterion"]: v["result"] for v in episode["validator_outputs"]}
+        self.assertEqual(criteria.get("Episode finished within step budget"), "FAIL")
+        self.assertEqual(validate.episode_errors(episode, {}), [])
 
 
 if __name__ == "__main__":

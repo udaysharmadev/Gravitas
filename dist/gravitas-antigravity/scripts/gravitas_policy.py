@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from gravitas_action import (
@@ -84,12 +85,34 @@ def target_in_scope(target: str, scopes: list, roots: list[Path], *,
     escapes resolve before comparison, and case folds only when the scope's
     own volume folds (roots and absolute scopes may sit on different ones)."""
     candidates = {canonical_path(target, [root]) for root in roots}
+    lexical_candidates = set()
+    if case_insensitive is False:
+        for root in roots:
+            text = target.replace("\\", "/") if os.name == "nt" else target
+            path = Path(text)
+            if not path.is_absolute():
+                path = root / path
+            lexical_candidates.add(path.absolute())
+
     for scope in scopes:
         if not isinstance(scope, str) or not scope:
             continue
         for root in roots:
             scope_path = canonical_path(scope, [root])
             fold = case_insensitive_fs(scope_path) if case_insensitive is None else case_insensitive
+            scope_parts = Path(path_key(scope_path, case_insensitive=fold)).parts
+            if lexical_candidates:
+                scope_text = scope.replace("\\", "/") if os.name == "nt" else scope
+                lexical_scope = Path(scope_text)
+                if not lexical_scope.is_absolute():
+                    lexical_scope = root / lexical_scope
+                lexical_scope_parts = lexical_scope.absolute().parts
+                if not any(
+                    len(candidate.parts) >= len(lexical_scope_parts)
+                    and candidate.parts[:len(lexical_scope_parts)] == lexical_scope_parts
+                    for candidate in lexical_candidates
+                ):
+                    continue
             for candidate in candidates:
                 if _path_is_within_scope(candidate, scope_path, case_insensitive=fold):
                     return True

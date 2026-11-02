@@ -84,6 +84,10 @@ def aggregate(episodes):
     """Compute per-configuration metrics; excludes INVALID (infrastructure) runs."""
     groups = defaultdict(list)
     for episode in episodes:
+        if not isinstance(episode, dict):
+            continue
+        if episode.get("configuration") is None:
+            continue
         if not episode.get("infrastructure_failure"):
             groups[episode["configuration"]].append(episode)
 

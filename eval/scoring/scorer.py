@@ -117,16 +117,80 @@ def detect_repetitions(tool_calls: list) -> int:
 
 # ── Metric Computation ────────────────────────────────────────
 
+def _files_in_args(args: dict) -> set:
+    """Extract file-like strings from tool-call args for grounding checks."""
+    files: set = set()
+    if not isinstance(args, dict):
+        return files
+    for key in ("file", "path", "filepath", "filename", "target", "target_file"):
+        value = args.get(key)
+        if isinstance(value, str) and value:
+            files.add(value)
+    # Generic fallback: any string arg value that looks like a file path.
+    for value in args.values():
+        if isinstance(value, str) and ("/" in value or value.endswith((".py", ".ts", ".js", ".md", ".yaml", ".json"))) and len(value) < 256:
+            # Avoid counting command output or prose.
+            if "\n" not in value:
+                files.add(value)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str) and ("/" in item or item.endswith((".py", ".ts", ".js"))) and "\n" not in item and len(item) < 256:
+                    files.add(item)
+    return files
+
+
+def _is_read_call(tc) -> bool:
+    return tc.tool in READ_ONLY_TOOLS
+
+
 def compute_recon_rate(runs: list) -> float:
-    """Compute recon-before-mutation rate."""
-    non_trivial = [r for r in runs if len(r.tool_calls) > 3]
-    if not non_trivial:
+    """Compute trace-based read-before-write grounding rate.
+
+    A run passes only when every file-targeted mutation was preceded by a
+    read-only call covering the same file. Mutations without an identifiable
+    file fall back to the legacy first-call-is-read-only check. Runs with no
+    mutations are excluded (nothing to ground).
+    """
+    grounded_runs = 0
+    mutated_runs = 0
+    for run in runs:
+        mutations = [(idx, tc) for idx, tc in enumerate(run.tool_calls) if is_mutation(tc)]
+        if not mutations:
+            continue
+        mutated_runs += 1
+        run_grounded = True
+        for idx, tc in mutations:
+            targets = _files_in_args(tc.args)
+            prior_reads: set = set()
+            for prev in run.tool_calls[:idx]:
+                if _is_read_call(prev):
+                    prior_reads |= _files_in_args(prev.args)
+            if not targets:
+                # No file attribution: require some read before this mutation.
+                if not prior_reads and not any(_is_read_call(prev) for prev in run.tool_calls[:idx]):
+                    run_grounded = False
+                    break
+                continue
+            # At least one target must have been read (exact or basename match).
+            covered = False
+            for target in targets:
+                base = target.rsplit("/", 1)[-1]
+                for seen in prior_reads:
+                    if seen == target or seen.endswith("/" + target) or target.endswith("/" + seen) or seen.rsplit("/", 1)[-1] == base:
+                        covered = True
+                        break
+                if covered:
+                    break
+            if not covered:
+                # Strict per-file check: targets exist but were never read
+                # before this mutation, so the run is ungrounded.
+                run_grounded = False
+                break
+        if run_grounded:
+            grounded_runs += 1
+    if not mutated_runs:
         return 0.0
-    reads_first = 0
-    for run in non_trivial:
-        if run.tool_calls and not is_mutation(run.tool_calls[0]):
-            reads_first += 1
-    return reads_first / len(non_trivial)
+    return grounded_runs / mutated_runs
 
 
 def compute_diff_scoping_ratio(runs: list, reference_diffs: dict) -> float:
@@ -154,15 +218,26 @@ def compute_false_completion_rate(runs: list) -> float:
 
 
 def compute_failure_repetition_rate(runs: list) -> float:
-    """Compute failure-repetition rate."""
+    """Compute exact-retry-after-failure rate from the tool-call trace.
+
+    A failure is a tool call whose output mentions error/fail/traceback.
+    An exact retry is the next tool call with identical tool + args.
+    This replaces the old heuristic that divided total duplicate calls by
+    failure count, which conflated benign repetition with banned retries.
+    """
     total_failures = 0
-    repeated = 0
+    exact_retries = 0
     for run in runs:
-        # Count failures as tool calls that return errors
-        failures = [tc for tc in run.tool_calls if tc.output and "error" in tc.output.lower()]
-        total_failures += len(failures)
-        repeated += detect_repetitions(run.tool_calls)
-    return repeated / total_failures if total_failures > 0 else 0.0
+        calls = run.tool_calls
+        for i, tc in enumerate(calls):
+            output = (tc.output or "").lower()
+            if "error" in output or "fail" in output or "traceback" in output or "exception" in output:
+                total_failures += 1
+                if i + 1 < len(calls):
+                    nxt = calls[i + 1]
+                    if nxt.tool == tc.tool and json.dumps(nxt.args, sort_keys=True) == json.dumps(tc.args, sort_keys=True):
+                        exact_retries += 1
+    return exact_retries / total_failures if total_failures > 0 else 0.0
 
 
 def compute_token_overhead(baseline_runs: list, gravitas_runs: list) -> float:

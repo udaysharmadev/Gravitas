@@ -44,7 +44,9 @@ not a sandbox — see `SECURITY.md`.
 Validator discovery (project config + binaries, never language
 stereotypes) feeds escalation: targeted → impact → suite → full.
 Reproduction-first debugging (`gravitas repro --phase before/after`);
-deterministic edge-case expansion for strict/security work.
+deterministic edge-case expansion for strict/security work. Reproducer
+contracts may pin argv by ID; otherwise the after run must use the exact
+command hash recorded by the most recent before run for that criterion.
 
 ## Recovery
 

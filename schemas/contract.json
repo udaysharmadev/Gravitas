@@ -45,6 +45,20 @@
         "required": ["id", "command"]
       }
     },
+    "reproducers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "command", "criterion_ids"],
+        "properties": {
+          "id": { "type": "string" },
+          "command": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "criterion_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    },
     "required_validators": { "type": "array", "items": { "type": "string", "pattern": "^VAL-\\d{3}$" } },
     "optional_validators": { "type": "array", "items": { "type": "string", "pattern": "^VAL-\\d{3}$" } },
     "delegation_policy": { "type": "string", "enum": ["forbidden", "allowed", "required"] },

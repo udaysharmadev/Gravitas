@@ -15,7 +15,8 @@
       ]
     },
     "tool_call_id": {"type": "string"},
-    "file": {"type": "string", "description": "Path associated with a read or write event."},
+    "file": {"type": ["string", "null"], "description": "Path associated with a read or write event; null marks an untracked/unknown write target."},
+    "file_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$", "description": "Content hash captured for a successfully read regular file; read-before-write accepts it only while the file still matches."},
     "command": {"type": ["string", "array"], "items": {"type": "string"}},
     "validator_id": {"type": "string"},
     "criterion_ids": {"type": "array", "items": {"type": "string"}},
@@ -24,6 +25,8 @@
     "required_reads": {"type": "array", "items": {"type": "string"}},
     "fingerprint": {"type": "string"},
     "phase": {"type": "string", "description": "Reproduction phase: before (failing evidence) or after (fix verification)."},
+    "reproducer_id": {"type": "string", "description": "Contract-declared reproducer associated with this execution."},
+    "working_directory": {"type": "string", "description": "Resolved working directory used by a reproducer execution."},
     "sensitive": {"type": "boolean", "description": "Read touched a likely secret-bearing file; treat retained content accordingly."},
     "anchor_pending": {"type": "boolean", "description": "Ledger entry written while the user-local anchor store was unavailable; verification treats it as a fail-closed deficit until a later anchor covers it."},
     "anchor_error": {"type": "string", "description": "Anchor-store failure that caused anchor_pending to be set."},

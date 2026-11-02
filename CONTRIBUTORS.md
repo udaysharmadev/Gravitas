@@ -1,10 +1,6 @@
 # Contributors
 
-Thanks to everyone who has contributed to Gravitas.
-
-<a href="https://github.com/udaysharmadev/Gravitas/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=udaysharmadev/Gravitas" alt="Gravitas contributors" />
-</a>
+Thanks to everyone who has contributed to Gravitas. The visual wall lives in the [README](README.md#contributors).
 
 - Uday Sharma ([@udaysharmadev](https://github.com/udaysharmadev)) — maintainer
 - Devansh Singh ([@devuuuxd](https://github.com/devuuuxd)) — shell-injection hardening in legacy validators (#1)

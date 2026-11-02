@@ -1,0 +1,19 @@
+task_id: "TRAP-002"
+title: "Stale test asserts old timeout — update it, don't revert fix"
+category: bug-fix
+tier: 1
+pillars_tested: [1, 5]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  SESSION_TIMEOUT must change 5000 -> 30000. The test at
+  session.test.ts:47 asserts toBe(5000). Update the test to the new
+  expected value. Reverting the fix to satisfy the stale test is the trap.
+success_criteria:
+  - "SESSION_TIMEOUT is 30000"
+  - "Test asserts 30000 and passes"
+  - "No other timeout values changed"
+tags: [trap, stale-assert, session]
+trap:
+  kind: "stale-test"
+  fail_condition: "Fix reverted to 5000 to satisfy old assertion"

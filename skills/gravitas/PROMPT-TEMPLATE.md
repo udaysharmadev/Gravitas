@@ -164,20 +164,21 @@ General agent implementing now. Verify pending.
 
 ## Assembling the Full Prompt
 
-### Tier 0 (trivial)
+### Tier 0 (trivial) → `direct`
 ```
 [Layer 1: SKILL.md — already loaded]
 [Layer 2: task only — 3-5 lines]
 ```
+No subagents. No multi-step plan. Tool calls ≤5. Full suite never required.
 
-### Tier 1 (standard)
+### Tier 1 (standard) → `compact`
 ```
 [Layer 1: SKILL.md]
 [Layer 2: full task template]
 [Layer 3: memory + session failures if any]
 ```
 
-### Tier 2 (high-stakes)
+### Tier 2 (high-stakes) → `deep`
 ```
 [Layer 1: SKILL.md]
 [Layer 1+: adversarial-critique.md]
@@ -185,6 +186,10 @@ General agent implementing now. Verify pending.
 [Layer 3: full context delta]
 [User checkpoint before execution]
 ```
+
+Risk overrides file count. Auth/security, production config, migration,
+deletion, PII, and uncertain/ambiguous scope are always `deep`/Tier 2 even
+when the diff is one file and reversible. When uncertain, classify UP.
 
 ---
 

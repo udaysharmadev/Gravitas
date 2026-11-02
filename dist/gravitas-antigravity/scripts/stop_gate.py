@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 from session_context import session_dir_for_payload
+from child_session import incomplete_children
 from evidence_chain import verify_with_anchor
 from evidence_chain import resolution_matches, resolution_records
 from gravitas_evidence import (
@@ -309,6 +310,18 @@ def main():
             ))
     state = load_state(session_dir)
     failures = load_failures(session_dir)
+
+    # Delegated work must be handed off before the parent can finish: an
+    # incomplete child means part of the contract is still unverified.
+    pending_children = incomplete_children(session_dir)
+    if pending_children:
+        reason = ("Completion gate: child session(s) not yet handed off: "
+                  + ", ".join(pending_children[:3])
+                  + (" and more" if len(pending_children) > 3 else "")
+                  + ". Complete the handoff before stopping.")
+        record_stop_gate_cycle(session_dir, "continue", reason)
+        print(json.dumps({"decision": "continue", "reason": reason}))
+        return
 
     if payload.get("fullyIdle") is False:
         reason = "Completion gate: Antigravity reports active background work."

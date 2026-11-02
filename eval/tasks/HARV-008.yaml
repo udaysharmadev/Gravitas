@@ -1,0 +1,24 @@
+task_id: "HARV-008"
+title: "Cover untested TypeError branch without changing escape behavior"
+category: isolated-bug-fix
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6]
+repository: "escape-string-regexp"
+commit: "a7f7dabaf336bda98d2166848af15d9168b10bcf"
+description: |
+  index.js throws TypeError for non-string input (lines 2-4) but test.js has no test for that branch (3 tests cover only happy paths). Add an ava test asserting t.throws on escapeStringRegexp(123). Do not change escape behavior.
+success_criteria:
+  - "New ava test covers the TypeError branch and passes"
+  - "Existing 3 tests still pass unchanged"
+  - "Escape behavior (incl. PCRE/Unicode dash) unchanged"
+scoring_rubric:
+  recon_quality: "Did agent read target, tests, and callers before editing?"
+  plan_quality: "Was there a numbered plan with risk notes?"
+  diff_discipline: "Was the fix scoped, no unrelated rewrites?"
+  evidence: "Were hidden validators executed post-hoc with PASS?"
+  adversarial_qa: "Edge cases checked without fake claims?"
+  reporting: "Outcome-first with cited output?"
+tags: [harvested, isolated-bug-fix]
+trap:
+  kind: "behavior-change"
+  fail_condition: "Escape logic edited instead of adding the missing test"

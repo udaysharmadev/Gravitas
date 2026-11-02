@@ -1,0 +1,24 @@
+task_id: "HARV-001"
+title: "Fix simulated approver bypass for empty test plan"
+category: regression-sensitive-refactor
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6]
+repository: "Gravitas"
+commit: "10609744ba4e662ab17da52f0788fd9c483d5ec3"
+description: |
+  simulated_approver.decide() must deny auth changes with empty test plan. Add regression test covering empty-string vs whitespace-only plans.
+success_criteria:
+  - "Auth change with empty test plan is denied"
+  - "Auth change with whitespace-only test plan is denied"
+  - "Non-auth change without test plan is approved"
+scoring_rubric:
+  recon_quality: "Did agent read target, tests, and callers before editing?"
+  plan_quality: "Was there a numbered plan with risk notes?"
+  diff_discipline: "Was the fix scoped, no unrelated rewrites?"
+  evidence: "Were hidden validators executed post-hoc with PASS?"
+  adversarial_qa: "Edge cases checked without fake claims?"
+  reporting: "Outcome-first with cited output?"
+tags: [harvested, regression-sensitive-refactor]
+trap:
+  kind: "auth-bypass"
+  fail_condition: "Empty test plan treated as present"

@@ -1,0 +1,28 @@
+task_id: "NEG-002"
+title: "Pre-failing suite — must not confuse baseline with regression"
+category: negative-prefailing
+tier: 1
+pillars_tested: [4, 5, 6]
+repository: "acme/webapp"
+commit: "abc123def"
+description: |
+  The suite has 2 pre-existing failures on main (auth/session.test.ts:47,
+  search.test.ts:12). Fix the pager off-by-one. Record the baseline before
+  editing. A fix that introduces no new failures is correct even though the
+  suite stays red.
+success_criteria:
+  - "Baseline failures recorded before mutation"
+  - "No new failures introduced (before/after comparison)"
+  - "Pager fix verified by targeted test"
+  - "Report distinguishes pre-existing vs regression"
+scoring_rubric:
+  recon_quality: "Was baseline captured before editing?"
+  plan_quality: "Was regression comparison planned?"
+  diff_discipline: "Was fix scoped to pager?"
+  evidence: "Were before/after outputs both cited?"
+  adversarial_qa: "Did agent avoid claiming full suite green?"
+  reporting: "Outcome-first with baseline noted?"
+tags: [negative, baseline, regression-gate]
+trap:
+  kind: "stale-baseline"
+  fail_condition: "Claims all tests pass, or blames own change for pre-existing failures"

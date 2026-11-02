@@ -163,6 +163,43 @@ class GuardTests(unittest.TestCase):
             # read-before-write: existing file never read -> deny is correct
             self.assertEqual(verdict["decision"], "deny")
 
+    def test_recorded_read_satisfies_read_before_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "a.py"
+            target.write_text("x = 1\n")
+            reads_dir = Path(tmp) / ".gravitas"
+            reads_dir.mkdir()
+            (reads_dir / "opencode-reads.jsonl").write_text(
+                json.dumps({"session": "", "file": "a.py", "source": "read"}) + "\n")
+            verdict = self.guard("edit", {"filePath": "a.py"},
+                                 {"mode": "implement", "allowed_write_scope": ["."]},
+                                 cwd=tmp)
+            self.assertEqual(verdict["decision"], "allow")
+
+    def test_reads_are_session_isolated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "a.py"
+            target.write_text("x = 1\n")
+            reads_dir = Path(tmp) / ".gravitas"
+            reads_dir.mkdir()
+            (reads_dir / "opencode-reads.jsonl").write_text(
+                json.dumps({"session": "other-session", "file": "a.py"}) + "\n"
+                + "not-json\n")
+            work = Path(tmp)
+            contract_path = work / "contract.json"
+            contract_path.write_text(json.dumps(
+                {"mode": "implement", "allowed_write_scope": ["."]}))
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "gravitas_cli.py"), "guard",
+                 "--contract", str(contract_path),
+                 "--envelope", json.dumps({"tool": "edit", "args": {"filePath": "a.py"},
+                                            "workspace_roots": [str(work)],
+                                            "conversation_id": "my-session",
+                                            "host": "opencode"})],
+                text=True, capture_output=True, cwd=work, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["decision"], "deny")
+
     def test_opencode_bash_maps_to_shell_policy(self):
         verdict = self.guard("bash", {"command": "rm -rf build/"},
                              {"mode": "implement", "allowed_write_scope": ["."]})
@@ -230,6 +267,52 @@ class GuardTests(unittest.TestCase):
             self.assertEqual(guard_for("session-a")["stale_validator_criteria"], ["AC1"])
             self.assertNotIn("stale_validator_criteria", guard_for("session-b"))
 
+    def test_empty_session_read_does_not_authorize_named_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "a.py"
+            target.write_text("x = 1\n")
+            reads_dir = Path(tmp) / ".gravitas"
+            reads_dir.mkdir()
+            (reads_dir / "opencode-reads.jsonl").write_text(
+                json.dumps({"session": "", "file": "a.py", "source": "read"}) + "\n")
+            work = Path(tmp)
+            contract_path = work / "contract.json"
+            contract_path.write_text(json.dumps(
+                {"mode": "implement", "allowed_write_scope": ["."]}))
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "gravitas_cli.py"), "guard",
+                 "--contract", str(contract_path),
+                 "--envelope", json.dumps({"tool": "edit", "args": {"filePath": "a.py"},
+                                            "workspace_roots": [str(work)],
+                                            "conversation_id": "session-a",
+                                            "host": "opencode"})],
+                text=True, capture_output=True, cwd=work, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["decision"], "deny")
+
+    def test_same_session_read_authorizes_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "a.py"
+            target.write_text("x = 1\n")
+            reads_dir = Path(tmp) / ".gravitas"
+            reads_dir.mkdir()
+            (reads_dir / "opencode-reads.jsonl").write_text(
+                json.dumps({"session": "session-a", "file": "a.py", "source": "read"}) + "\n")
+            work = Path(tmp)
+            contract_path = work / "contract.json"
+            contract_path.write_text(json.dumps(
+                {"mode": "implement", "allowed_write_scope": ["."]}))
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "gravitas_cli.py"), "guard",
+                 "--contract", str(contract_path),
+                 "--envelope", json.dumps({"tool": "edit", "args": {"filePath": "a.py"},
+                                            "workspace_roots": [str(work)],
+                                            "conversation_id": "session-a",
+                                            "host": "opencode"})],
+                text=True, capture_output=True, cwd=work, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["decision"], "allow")
+
 
 class ShimMappingTests(unittest.TestCase):
     def test_to_envelope_mapping(self):
@@ -291,5 +374,39 @@ class ShimMappingTests(unittest.TestCase):
                              ["session-a", "session-b"])
             self.assertTrue(events[0]["success"])
             self.assertNotIn("secret", events[0]["args"]["command"])
+
+    def test_after_hook_records_only_successful_session_reads(self):
+        if shutil.which("node") is None:
+            self.skipTest("node not available")
+        shim = ADAPTER / "plugin" / "gravitas.js"
+        with tempfile.TemporaryDirectory() as directory:
+            script = (
+                f"import({json.dumps(shim.as_uri())}).then(async m => {{"
+                f" const hooks = await m.GravitasPlugin({{directory:{json.dumps(directory)}}});"
+                # successful read records session-scoped evidence
+                " await hooks['tool.execute.after']({tool:'read',sessionID:'session-a'},"
+                " {args:{filePath:'a.py'},success:true});"
+                # failed read records nothing
+                " await hooks['tool.execute.after']({tool:'read',sessionID:'session-a'},"
+                " {args:{filePath:'b.py'},error:'read failed'});"
+                # session-less read records nothing (fail-closed)
+                " await hooks['tool.execute.after']({tool:'read'},"
+                " {args:{filePath:'c.py'},success:true});"
+                "});"
+            )
+            result = subprocess.run(
+                ["node", "--input-type=module", "-e", script],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            reads_path = Path(directory) / ".gravitas" / "opencode-reads.jsonl"
+            rows = [
+                json.loads(line) for line in
+                reads_path.read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(
+                [(row["session"], row["file"]) for row in rows],
+                [("session-a", "a.py")],
+            )
 if __name__ == "__main__":
     unittest.main()

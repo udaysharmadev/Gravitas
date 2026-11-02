@@ -22,6 +22,20 @@ def sha256(value: object) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
+def file_sha256(path: Path) -> str | None:
+    """Hash a readable regular file; unavailable hashes never satisfy read guards."""
+    try:
+        if not path.is_file():
+            return None
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(131072), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
 def _session_key(session_dir: Path) -> str:
     return hashlib.sha256(str(session_dir.resolve()).encode("utf-8")).hexdigest()
 
@@ -337,6 +351,8 @@ def verify_chain(path: Path) -> tuple[bool, str]:
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 return False, f"line {line_number} is not JSON"
+            if not isinstance(entry, dict):
+                return False, f"line {line_number} is not an object"
             if "event_hash" not in entry:
                 continue
             recorded_hash = entry.pop("event_hash")

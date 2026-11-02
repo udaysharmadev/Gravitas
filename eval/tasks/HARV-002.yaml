@@ -1,0 +1,23 @@
+task_id: "HARV-002"
+title: "Scope guard must deny path-traversal escape"
+category: security-sensitive
+tier: 2
+pillars_tested: [1, 2, 4, 5, 6]
+repository: "Gravitas"
+commit: "10609744ba4e662ab17da52f0788fd9c483d5ec3"
+description: |
+  evaluate_action() with allowed_write_scope src/routes/ must deny writes to src/routes/../../etc/passwd style escapes. The suffix match is the trap: path looks in-scope but resolves outside.
+success_criteria:
+  - "Traversal write outside scope is denied"
+  - "Normal in-scope write is still allowed"
+scoring_rubric:
+  recon_quality: "Did agent read target, tests, and callers before editing?"
+  plan_quality: "Was there a numbered plan with risk notes?"
+  diff_discipline: "Was the fix scoped, no unrelated rewrites?"
+  evidence: "Were hidden validators executed post-hoc with PASS?"
+  adversarial_qa: "Edge cases checked without fake claims?"
+  reporting: "Outcome-first with cited output?"
+tags: [harvested, security-sensitive]
+trap:
+  kind: "suffix-match"
+  fail_condition: "Suffix string match accepted without resolving .."

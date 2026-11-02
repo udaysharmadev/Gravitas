@@ -124,7 +124,7 @@ No release-eligible episodes are published in `benchmarks/results/`. Local
 aggregate canary artifacts may exist while developing the runner, but they are
 ignored, are not episode files, and are not model-comparison evidence.
 
-The manifest now registers 30 task specifications. The implementation adapter
+The manifest now registers 48 task specifications (30 core + 5 negative + 5 trap + 8 harvested across the same 10 lanes; holdout unchanged). The implementation adapter
 materializes a disposable, intentionally failing synthetic fixture for each
 registered task. Its model is restricted to reading files, replacing one
 allowlisted source file, running one fixed test command, and finishing; every
@@ -133,6 +133,11 @@ plumbing only. Licensed fixture repositories and hidden deterministic
 validators are still required before any implementation episode can be used in
 a model comparison. Development smoke artifacts are ignored by git and must
 never be presented as model-comparison results.
+
+The report command validates each episode against
+`benchmarks/runner/episode.schema.json` and checks derived outcome fields against
+the validator results before aggregation. Contradictory or malformed episodes
+fail the report instead of contributing to published metrics.
 
 Hidden acceptance tests are materialized only after the agent trajectory ends.
 Episode worktrees use owner-only (`0700`) permissions on POSIX systems; if the

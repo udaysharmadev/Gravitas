@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """GravitasBench reproducibility CLI (invoked via `gravitas bench ...`)."""
 import argparse
+import importlib.util
 import json
 import shutil
 import sys
@@ -8,6 +9,18 @@ from pathlib import Path
 
 RUNNER = Path(__file__).resolve().parent / "runner"
 sys.path.insert(0, str(RUNNER))
+
+
+def _load_runner_module(name):
+    spec = importlib.util.spec_from_file_location(f"gravitas_runner_{name}", RUNNER / f"{name}.py")
+    if spec is None:
+        raise ImportError(f"cannot load benchmark runner module: {name}")
+    loader = spec.loader
+    if loader is None:
+        raise ImportError(f"cannot load benchmark runner module: {name}")
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
 
 
 def cmd_doctor(_args):
@@ -69,12 +82,29 @@ def cmd_run(args):
 
 def cmd_report(args):
     """Validate episodes, aggregate, compare, and write the gated report."""
-    from compare import compare
-    from metrics import aggregate
-    from report import write_report
-    from validate import validate_episodes
+    try:
+        from jsonschema import Draft7Validator
+    except ImportError:
+        print("jsonschema is required: pip install -r benchmarks/runner/requirements.txt",
+              file=sys.stderr)
+        return 2
+
+    compare = _load_runner_module("compare").compare
+    aggregate = _load_runner_module("metrics").aggregate
+    write_report = _load_runner_module("report").write_report
+    validate_episodes = _load_runner_module("validate").validate_episodes
+
     episodes_dir = Path(args.episodes)
-    episodes, invalid = validate_episodes(episodes_dir)
+    schema_path = RUNNER / "episode.schema.json"
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        episodes, invalid = validate_episodes(episodes_dir, schema, Draft7Validator)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(f"Episode validation failed: {error}", file=sys.stderr)
+        return 2
+    if not episodes:
+        print(f"Episode validation failed: no valid episodes in {episodes_dir}", file=sys.stderr)
+        return 2
     summary = aggregate(episodes)
     comparisons = []
     if args.baseline and args.treatment:

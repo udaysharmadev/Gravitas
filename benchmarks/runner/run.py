@@ -87,6 +87,10 @@ def has_numbered_plan(text):
 
 
 def build_episode(task, model, configuration, response, tokens, duration, error=None):
+    try:
+        from outcome import derive_outcome
+    except ImportError:  # pragma: no cover - script invoked from repo root
+        from benchmarks.runner.outcome import derive_outcome
     valid_plan = has_numbered_plan(response) if not error else False
     validator_outputs = [
         {
@@ -101,6 +105,12 @@ def build_episode(task, model, configuration, response, tokens, duration, error=
         },
     ]
     solved = bool(validator_outputs) and all(item["result"] == "PASS" for item in validator_outputs)
+    outcome = derive_outcome(
+        tests_passing=valid_plan,
+        finished_normally=not error,
+        scope_ok=True,
+        infrastructure_failure=bool(error),
+    )
     return {
         "task_id": task["task_id"],
         "task_lane": "plan-only-constraint",
@@ -125,6 +135,7 @@ def build_episode(task, model, configuration, response, tokens, duration, error=
         "scope_violation": False,
         "regression": False,
         "infrastructure_failure": bool(error),
+        "outcome": outcome,
         "notes": "Smoke-only plan episode; not comparable to fixture-backed implementation results.",
     }
 

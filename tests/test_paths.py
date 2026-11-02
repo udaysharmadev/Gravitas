@@ -30,6 +30,7 @@ swapped or a directory renamed between the policy decision and the host's
 actual write is outside what a pre-action hook can observe; this is the
 same documented limit as enumerable shell writes in gravitas_policy.
 """
+import hashlib
 import json
 import os
 import subprocess
@@ -147,6 +148,23 @@ class ScopeMatrixTests(unittest.TestCase):
         self.assertTrue(target_in_scope("src/a.py", ["Src"], [self.base], case_insensitive=True))
         self.assertFalse(target_in_scope("SRC/a.py", ["src"], [self.base], case_insensitive=False))
 
+    def test_case_sensitive_scope_requires_exact_components(self):
+        self.assertTrue(target_in_scope("src/a.py", ["src"], [self.base], case_insensitive=False))
+        self.assertFalse(target_in_scope("SRC/a.py", ["src"], [self.base], case_insensitive=False))
+        self.assertFalse(target_in_scope("src/a.py", ["SRC"], [self.base], case_insensitive=False))
+
+    def test_scope_comparison_uses_path_components_not_string_prefixes(self):
+        self.assertFalse(target_in_scope("source/a.py", ["src"], [self.base], case_insensitive=False))
+        self.assertTrue(target_in_scope("src/nested/a.py", ["src"], [self.base], case_insensitive=False))
+
+    def test_case_sensitive_scope_checks_each_workspace_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            second_root = Path(directory)
+            (second_root / "src").mkdir()
+            roots = [self.base, second_root]
+            self.assertTrue(target_in_scope("src/a.py", ["src"], roots, case_insensitive=False))
+            self.assertFalse(target_in_scope("SRC/a.py", ["src"], roots, case_insensitive=False))
+
     def test_dotdot_escape_denied_under_every_fold(self):
         for fold in (True, False):
             for target in ("src/../../x", "SRC/../../x", "../outside.txt", "/etc/passwd"):
@@ -233,6 +251,7 @@ class RecordTimeTests(unittest.TestCase):
         self.record_read("./sub/../Module.py")
         entries = [json.loads(line) for line in (self.session / "evidence.jsonl").read_text().splitlines()]
         self.assertEqual(entries[-1]["file"], str((self.cwd / "Module.py").resolve()))
+        self.assertEqual(entries[-1]["file_sha256"], hashlib.sha256((self.cwd / "Module.py").read_bytes()).hexdigest())
 
     def test_recorded_read_satisfies_absolute_and_case_variant_writes(self):
         self.record_read("./Module.py")
@@ -243,6 +262,17 @@ class RecordTimeTests(unittest.TestCase):
 
     def test_dotdot_read_does_not_satisfy_sibling_write(self):
         self.record_read("../Module.py")
+        self.assertEqual(self.pre_write("Module.py"), "deny")
+
+    def test_changed_file_after_read_requires_reread(self):
+        self.record_read("Module.py")
+        (self.cwd / "Module.py").write_text("x = 2\n")
+        self.assertEqual(self.pre_write("Module.py"), "deny")
+
+    def test_legacy_path_only_read_requires_reread(self):
+        (self.session / "evidence.jsonl").write_text(json.dumps({
+            "source": "read", "file": str(self.cwd / "Module.py"),
+        }) + "\n")
         self.assertEqual(self.pre_write("Module.py"), "deny")
 
 

@@ -25,7 +25,13 @@
     {"input": "explain how TCP/IP works", "expect": false},
     {"input": "translate this text to Spanish", "expect": false},
     {"input": "write a poem about software engineering", "expect": false},
-    {"input": "what are your capabilities?", "expect": false}
+    {"input": "what are your capabilities?", "expect": false},
+    {"input": "explain what this regex does: ^[a-z]+@[a-z]+\\.com$", "expect": false, "note": "near-miss: code explanation, no repo mutation"},
+    {"input": "summarize this diff for the changelog", "expect": false, "note": "near-miss: read-only summary"},
+    {"input": "what does this stack trace mean?", "expect": false, "note": "near-miss: diagnosis question, no edit requested"},
+    {"input": "review this snippet for style, do not change any files", "expect": false, "note": "near-miss: explicit no-write review question"},
+    {"input": "explain the difference between merge and rebase", "expect": false, "note": "near-miss: git concept question"},
+    {"input": "how do I configure my editor for Python?", "expect": false, "note": "near-miss: env question, no repo task"}
   ],
-  "notes": "Non-activations are harder to enforce via description-based triggering. The key requirement is that intended activations reach >95%. False positives on non-engineering tasks are acceptable since the skill adds discipline without breaking non-technical tasks."
+  "notes": "Non-activations include 6 near-miss engineering questions (explain/summarize, no mutation requested) that must NOT trigger file writes. Intended activations must reach >95%. False positives on near-miss items count as trigger failures."
 }

@@ -13,7 +13,7 @@
 
 **Scenario:** Agent reads `src/utils.ts` during recon. Between recon and edit, another process or concurrent agent deletes the file.
 
-**Handling:** Before every mutating call, re-read the target file or check existence. If the file no longer exists, re-plan. Do not attempt to edit a file that may have been deleted.
+**Handling:** Check that the target still exists before mutation. For an existing file, the read-before-write guard accepts a prior successful read only while the recorded content hash still matches; if the file is missing or its hash changed, re-read and re-plan before editing. After interruption/resume, a model switch, or failure resolution, re-read the target regardless of its prior hash.
 
 **Recovery:**
 1. Re-check file existence with `ls` or `read`.
@@ -27,7 +27,7 @@
 
 **Scenario:** Agent reads `src/api/handler.ts` during recon. Between recon and edit, another agent or concurrent process modifies the file. The agent's planned edit is now based on stale context.
 
-**Handling:** Re-read critical files immediately before editing. If the file has changed since recon, re-evaluate whether the planned edit is still correct.
+**Handling:** A successful read records the file's content hash. The read-before-write guard rejects the prior read if the current hash differs, requiring a fresh read before editing. Re-read critical files after interruption/resume, a model switch, or failure resolution even when their hash is unchanged. See the [recovery protocol](../skills/gravitas/references/recovery.md#recovery-protocol).
 
 **Recovery:**
 1. Re-read the file and diff it against the recon snapshot.
