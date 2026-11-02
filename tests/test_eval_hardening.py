@@ -87,7 +87,7 @@ class NegativeTaskTests(unittest.TestCase):
 
 class LegacyScorerTests(unittest.TestCase):
     def test_no_honest_uncertainty_penalty(self):
-        text = (ROOT / "benchmarks/legacy/superseded/benchmark.py").read_text()
+        text = (ROOT / "benchmarks/legacy/superseded/benchmark.py").read_text(encoding="utf-8")
         self.assertIn("DEPRECATED", text)
         # The old phrase-score list must be gone; honest uncertainty
         # ("probably", "i think") must not affect scores.

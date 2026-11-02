@@ -850,15 +850,14 @@ UNICODE_INSENSITIVE_FS = sys.platform == "darwin"
 
 def canonical_path(raw: str, roots: list[Path] | None = None, *,
                    windows: bool | None = None) -> Path:
-    """Record-time path identity: absolute and realpath-resolved.
+    """Record-time path identity: absolute, lexical-normalized, and symlink-aware.
 
-    Relative paths join the first workspace root (cwd when none). ``.``,
-    ``..`` and symlinks resolve against the filesystem, so an escape stays
-    visible to scope checks. Case and Unicode form are preserved:
-    :func:`path_key` folds them for comparison only, because a folded
-    path can name a different file on a sensitive volume. ``\\`` is a
-    separator only under Windows semantics; on POSIX it is a filename
-    character.
+    Relative paths join the first workspace root (cwd when none). ``.`` and
+    ``..`` are folded lexically so the original case and Unicode remain visible
+    to scope checks, while symlinks still resolve to their target. A plain path
+    on a case-insensitive volume should not be silently rewritten to a different
+    case just because the filesystem folds it; :func:`path_key` does the
+    compare-time folding instead.
     """
     text = str(raw)
     if os.name == "nt" if windows is None else windows:
@@ -866,7 +865,11 @@ def canonical_path(raw: str, roots: list[Path] | None = None, *,
     path = Path(text)
     if not path.is_absolute():
         path = (roots[0] if roots else Path.cwd()) / path
-    return path.resolve(strict=False)
+
+    lexical = Path(os.path.abspath(os.path.normpath(str(path))))
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+        return lexical.resolve(strict=False)
+    return lexical
 
 
 @lru_cache(maxsize=None)

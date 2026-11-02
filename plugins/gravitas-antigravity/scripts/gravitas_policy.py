@@ -63,6 +63,22 @@ def action_fingerprint(tool: str, args: dict) -> str:
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
+def _path_is_within_scope(candidate: Path, scope: Path, *, case_insensitive: bool) -> bool:
+    """Compare concrete paths with a boundary-aware string check.
+
+    ``Path.relative_to`` follows the host filesystem semantics, which makes it
+    impossible to enforce a deliberate ``case_insensitive=False`` check on a
+    case-folding volume. The scope guard must therefore compare the folded path
+    strings directly and require a directory boundary (slash or backslash)
+    before a descendant match.
+    """
+    candidate_key = path_key(candidate, case_insensitive=case_insensitive).replace("\\", "/")
+    scope_key = path_key(scope, case_insensitive=case_insensitive).replace("\\", "/").rstrip("/")
+    if not scope_key:
+        return True
+    return candidate_key == scope_key or candidate_key.startswith(scope_key + "/")
+
+
 def target_in_scope(target: str, scopes: list, roots: list[Path], *,
                     case_insensitive: bool | None = None) -> bool:
     """Both sides go through canonical_path + path_key: ``..`` and symlink
@@ -98,9 +114,7 @@ def target_in_scope(target: str, scopes: list, roots: list[Path], *,
                 ):
                     continue
             for candidate in candidates:
-                candidate_parts = Path(path_key(candidate, case_insensitive=fold)).parts
-                if (len(candidate_parts) >= len(scope_parts)
-                        and candidate_parts[:len(scope_parts)] == scope_parts):
+                if _path_is_within_scope(candidate, scope_path, case_insensitive=fold):
                     return True
     return False
 
