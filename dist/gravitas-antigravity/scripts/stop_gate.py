@@ -25,6 +25,7 @@ from gravitas_evidence import (
     declared_validator_pass,
     evidence_deficit,
     is_fresh,
+    latest_validator_results,
     opencode_completion_writes,
     owned_validator_pass,
 )
@@ -396,22 +397,23 @@ def main():
         for validator in contract.get("validators", [])
         if isinstance(validator, dict) and isinstance(validator.get("id"), str)
     }
-    required_validator_ids = list(declared_validators)
-    missing_validators = [
-        validator for validator in required_validators
-        if not any(
-            legacy_requirement_met(validator, entry) and owned_validator_pass(entry) and is_fresh(entry, evidence)
-            for entry in evidence
-        )
-    ]
+    latest = latest_validator_results(evidence)
+    missing_validators = []
+    for requirement in required_validators:
+        matching = [entry for entry in evidence if isinstance(entry, dict)
+                    and entry.get("source") == "validator"
+                    and legacy_requirement_met(requirement, entry)]
+        current = matching[-1] if matching else None
+        if (current is None
+                or latest.get(current.get("validator_id")) is not current
+                or not owned_validator_pass(current)
+                or not is_fresh(current, evidence)):
+            missing_validators.append(requirement)
     missing_validators.extend(
-        validator_id for validator_id in required_validator_ids
-        if not any(
-            entry.get("validator_id") == validator_id
-            and declared_validator_pass(entry, declared_validators[validator_id])
-            and is_fresh(entry, evidence)
-            for entry in evidence
-        )
+        validator_id for validator_id, validator in declared_validators.items()
+        if validator_id not in latest
+        or not declared_validator_pass(latest[validator_id], validator)
+        or not is_fresh(latest[validator_id], evidence)
     )
     if missing_validators:
         reason = "Completion gate: required validators missing or failing: " + ", ".join(missing_validators)

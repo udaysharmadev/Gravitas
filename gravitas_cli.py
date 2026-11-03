@@ -8,6 +8,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import sysconfig
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -15,15 +16,18 @@ MODULE_ROOT = Path(__file__).resolve().parent
 
 
 def installed_assets_root() -> Path | None:
-    """Location of runtime assets shipped inside the wheel (sys.prefix/share).
-
-    The wheel lays files out under share/gravitas/ mirroring the repository
-    root (plugins/..., skills/...), so the rest of the CLI works unchanged.
-    """
-    candidate = Path(sys.prefix) / "share" / "gravitas" / "plugins" / "gravitas-antigravity"
-    if (candidate / "scripts").is_dir():
-        return candidate.parents[1]  # share/gravitas/ mirrors the repo layout root
-    return None
+    """Locate wheel assets in the installation scheme containing this module."""
+    module_root = MODULE_ROOT.resolve()
+    for scheme in sysconfig.get_scheme_names():
+        if not scheme.endswith("_user"):
+            continue
+        module_paths = {Path(sysconfig.get_path(kind, scheme=scheme)).resolve()
+                        for kind in ("purelib", "platlib")}
+        if module_root in module_paths:
+            candidate = Path(sysconfig.get_path("data", scheme=scheme)) / "share" / "gravitas"
+            return candidate if (candidate / "plugins/gravitas-antigravity/scripts").is_dir() else None
+    candidate = Path(sys.prefix) / "share" / "gravitas"
+    return candidate if (candidate / "plugins/gravitas-antigravity/scripts").is_dir() else None
 
 
 def runtime_root() -> Path:

@@ -7,9 +7,13 @@ from pathlib import Path
 
 def episode_errors(episode, schema, schema_validator=None):
     try:
-        from outcome import derive_outcome, expected_derived_fields
+        from outcome import (
+            derive_outcome, expected_derived_fields, outcome_from_validators, validators_pass,
+        )
     except ImportError:  # pragma: no cover - script invoked from repo root
-        from benchmarks.runner.outcome import derive_outcome, expected_derived_fields
+        from benchmarks.runner.outcome import (
+            derive_outcome, expected_derived_fields, outcome_from_validators, validators_pass,
+        )
     if not isinstance(episode, dict):
         return ["episode must be a JSON object; aggregate arrays are not episode files"]
     errors = [error.message for error in schema_validator(schema).iter_errors(episode)] if schema_validator else []
@@ -20,18 +24,32 @@ def episode_errors(episode, schema, schema_validator=None):
     missing = sorted(required_fields - episode.keys())
     if missing:
         errors.append("missing required fields: " + ", ".join(missing))
+    for field in ("task_id", "configuration"):
+        if field in episode and (not isinstance(episode[field], str) or not episode[field].strip()):
+            errors.append(f"{field} must be a non-empty string")
+    for field in ("claimed_success", "functional_solve", "false_completion", "infrastructure_failure"):
+        if field in episode and not isinstance(episode[field], bool):
+            errors.append(f"{field} must be a boolean")
 
     outputs = episode.get("validator_outputs")
     if not isinstance(outputs, list):
         errors.append("validator_outputs must be a list")
         outputs = []
-    results = []
+    criteria = set()
     for index, output in enumerate(outputs):
         result = output.get("result") if isinstance(output, dict) else None
         if not isinstance(result, str) or result not in {"PASS", "FAIL", "INVALID"}:
             errors.append(f"validator_outputs[{index}].result must be PASS, FAIL, or INVALID")
-        else:
-            results.append(result)
+        if isinstance(output, dict) and "criterion" in output:
+            criterion = output["criterion"]
+            if not isinstance(criterion, str) or not criterion.strip():
+                errors.append(f"validator_outputs[{index}].criterion must be a non-empty string")
+            elif criterion in criteria:
+                errors.append(f"duplicate validator criterion: {criterion}")
+            else:
+                criteria.add(criterion)
+    if episode.get("simulated_approval") is True and "Tier-2 checkpoint (simulated)" not in criteria:
+        errors.append("simulated_approval requires a Tier-2 checkpoint validator")
     expected = expected_derived_fields(outputs, episode.get("claimed_success"))
     if expected is None:
         errors.append("validator_outputs must be a non-empty list")
@@ -39,23 +57,38 @@ def episode_errors(episode, schema, schema_validator=None):
     for field, value in expected.items():
         if field in episode and episode[field] != value:
             errors.append(f"{field} must be {value!r} from validator outputs")
-    outcome = episode.get("outcome")
-    if outcome is not None:
-        if not isinstance(outcome, dict):
-            errors.append("outcome must be an object when present")
-        else:
-            recomputed = expected_derived_fields(outputs, episode.get("claimed_success"))
-            # outcome.components must reconstruct the same functional_solve
-            components = {
-                key: outcome.get(key)
-                for key in ("tests_passing", "finished_normally", "scope_ok", "infrastructure_failure")
-            }
-            if all(isinstance(value, bool) for value in components.values()):
-                check = derive_outcome(**components)
-                if check["functional_solve"] != expected["functional_solve"]:
-                    errors.append("outcome components disagree with validator outputs")
-                if outcome.get("functional_solve") != expected["functional_solve"]:
-                    errors.append("outcome.functional_solve must match validator outputs")
+    if "outcome" not in episode:
+        return errors
+    outcome = episode["outcome"]
+    if not isinstance(outcome, dict):
+        errors.append("outcome must be an object when present")
+        return errors
+    component_names = ("tests_passing", "finished_normally", "scope_ok", "infrastructure_failure")
+    components = {key: outcome.get(key) for key in component_names}
+    for field, value in components.items():
+        if not isinstance(value, bool):
+            errors.append(f"outcome.{field} must be a boolean")
+    for field in ("functional_solve", "validators_passing"):
+        if field == "validators_passing" and field not in outcome:
+            continue
+        if not isinstance(outcome.get(field), bool):
+            errors.append(f"outcome.{field} must be a boolean")
+    reconstructed = outcome_from_validators(outputs)
+    if reconstructed is not None:
+        for field in component_names:
+            if isinstance(outcome.get(field), bool) and outcome[field] != reconstructed[field]:
+                errors.append(f"outcome.{field} must match validator outputs")
+    if outcome.get("infrastructure_failure") != expected["infrastructure_failure"]:
+        errors.append("outcome.infrastructure_failure must match validator outputs")
+    passing = validators_pass(outputs)
+    if "validators_passing" in outcome and outcome["validators_passing"] != passing:
+        errors.append("outcome.validators_passing must match validator outputs")
+    if all(isinstance(value, bool) for value in components.values()):
+        check = derive_outcome(**components, validators_passing=passing if reconstructed is not None else None)
+        if check["functional_solve"] != expected["functional_solve"]:
+            errors.append("outcome components disagree with validator outputs")
+    if outcome.get("functional_solve") != expected["functional_solve"]:
+        errors.append("outcome.functional_solve must match validator outputs")
     return errors
 
 

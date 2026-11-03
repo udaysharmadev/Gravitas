@@ -8,3 +8,4 @@ Thanks to everyone who has contributed to Gravitas. The visual wall lives in the
 - Rudra Makwana ([@RudraMakwana257](https://github.com/RudraMakwana257)) — strict-security delegation routing (#9), evidence fail-closed timestamps (#51, fixes #22), shell-mutation write records (#52, fixes #23), sed/exec-config hardening (#31–#33)
 - Prajapati Neel Dharmendra ([@Neel-2606](https://github.com/Neel-2606)) — shell redirection, env-assignment, and wrapper-flag classification (#34–#36)
 - Ankit Tiwari ([@ankitkumartiwari-web](https://github.com/ankitkumartiwari-web)) — gate/contract hardening (#42–#45), Windows portability and test reliability (#49, fixes #50)
+- Pasit Nusso ([@montionugera](https://github.com/montionugera)) — contributions via #82 “fix(paths): canonicalize paths at record time and add normalization matrix test…”

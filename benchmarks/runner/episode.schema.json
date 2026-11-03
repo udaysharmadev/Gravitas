@@ -29,7 +29,39 @@
     "claimed_success": {"type": "boolean"},
     "functional_solve": {"type": "boolean"},
     "false_completion": {"type": "boolean"},
-    "infrastructure_failure": {"type": "boolean"}
+    "infrastructure_failure": {"type": "boolean"},
+    "run_index": {"type": "integer", "minimum": 1},
+    "evidence_kind": {"type": "string", "enum": ["smoke", "synthetic", "repository"]},
+    "provenance": {
+      "type": "object",
+      "description": "Repository experiment declarations required by the publication gate, optional for legacy preview episodes. Hashes and revisions are structurally checked; authenticity still requires artifact review.",
+      "properties": {
+        "repository_url": {"type": "string", "minLength": 1},
+        "repository_license": {"type": "string", "minLength": 1},
+        "dataset_version": {"type": "string", "pattern": "^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"},
+        "fixture_hash": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+        "prompt_hash": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+        "model_revision": {"type": "string", "minLength": 1},
+        "host_revision": {"type": "string", "minLength": 1},
+        "harness_revision": {"type": "string", "pattern": "^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"},
+        "configuration_hash": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+        "evaluator_revision": {"type": "string", "pattern": "^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"}
+      },
+      "additionalProperties": true
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["tests_passing", "finished_normally", "scope_ok", "infrastructure_failure", "functional_solve"],
+      "properties": {
+        "tests_passing": {"type": "boolean"},
+        "finished_normally": {"type": "boolean"},
+        "scope_ok": {"type": "boolean"},
+        "infrastructure_failure": {"type": "boolean"},
+        "validators_passing": {"type": "boolean"},
+        "functional_solve": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    }
   },
   "additionalProperties": true
 }

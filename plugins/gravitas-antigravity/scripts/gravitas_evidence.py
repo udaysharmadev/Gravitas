@@ -117,8 +117,26 @@ def is_fresh(entry: dict, evidence: list[dict]) -> bool:
     return cutoff is None or moment > cutoff
 
 
+def latest_validator_results(evidence: list[dict]) -> dict[str, dict]:
+    """Return the last owned execution for each validator in ledger order."""
+    latest = {}
+    for entry in evidence:
+        if not isinstance(entry, dict) or entry.get("source") not in OWNED_SOURCES:
+            continue
+        identifier = entry.get("validator_id")
+        if isinstance(identifier, str) and identifier:
+            latest[identifier] = entry
+    return latest
+
+
 def criterion_states(contract: dict, evidence: list[dict]) -> dict:
     """Map criterion id -> {statement, status, evidence, fresh}."""
+    evidence = [entry for entry in evidence if isinstance(entry, dict)]
+    validators = {
+        item["id"]: item for item in contract.get("validators", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    latest = latest_validator_results(evidence)
     states = {}
     for index, criterion in enumerate(contract.get("acceptance_criteria", []), 1):
         if isinstance(criterion, dict):
@@ -136,14 +154,39 @@ def criterion_states(contract: dict, evidence: list[dict]) -> dict:
             continue
         linked = [e for e in evidence if identifier in (e.get("criterion_ids", []) or [])]
         owned = [e for e in linked if e.get("source") in OWNED_SOURCES]
-        fresh_owned = sorted(
-            (e for e in owned if is_fresh(e, evidence)),
-            key=lambda e: parse_time(e.get("timestamp")) or datetime.min.replace(tzinfo=timezone.utc))
-        # Latest fresh owned verdict governs: a FAIL after a PASS means the
-        # criterion is currently failing, not satisfied.
-        latest = fresh_owned[-1] if fresh_owned else None
-        fresh_pass = latest is not None and owned_validator_pass(latest)
-        fresh_fail = latest is not None and latest.get("verdict") == "FAIL"
+        assigned = set(criterion.get("validators", []) or []) if isinstance(criterion, dict) else set()
+        assigned.update(
+            validator_id for validator_id, validator in validators.items()
+            if identifier in (validator.get("criterion_ids", []) or [])
+        )
+        if not assigned:
+            assigned = {e.get("validator_id") for e in owned
+                        if isinstance(e.get("validator_id"), str)}
+        validator_statuses = {}
+        for validator_id in sorted(assigned):
+            current = latest.get(validator_id)
+            if current and is_fresh(current, evidence) and current.get("verdict") == "FAIL":
+                validator_statuses[validator_id] = "FAIL"
+                continue
+            bound_pass = None
+            for entry in evidence:
+                if entry.get("source") not in OWNED_SOURCES or entry.get("validator_id") != validator_id:
+                    continue
+                passing = (
+                    declared_validator_pass(entry, validators[validator_id])
+                    if validator_id in validators else owned_validator_pass(entry) and not validators
+                )
+                # A failed or unverifiable execution revokes prior criterion credit,
+                # including executions that omitted --criterion-id.
+                if not passing or not is_fresh(entry, evidence):
+                    bound_pass = None
+                elif identifier in (entry.get("criterion_ids", []) or []):
+                    bound_pass = entry
+            validator_statuses[validator_id] = "PASS" if bound_pass is not None else "PENDING"
+        fresh_pass = bool(validator_statuses) and all(
+            status == "PASS" for status in validator_statuses.values()
+        )
+        fresh_fail = "FAIL" in validator_statuses.values()
         stale_owned = [e for e in owned if not is_fresh(e, evidence)]
         reproducer = [e for e in linked if e.get("source") == "reproducer"]
         unverifiable = [e for e in reproducer if e.get("verdict") == "UNVERIFIABLE"]
@@ -165,6 +208,7 @@ def criterion_states(contract: dict, evidence: list[dict]) -> dict:
             "evidence": [e.get("event_hash", e.get("evidence", "")) for e in linked],
             "fresh": bool(fresh_pass),
             "stale_owned": len(stale_owned),
+            "validators": validator_statuses,
         }
     return states
 
@@ -187,6 +231,12 @@ def evidence_deficit(contract: dict, states: dict) -> list[dict]:
         else:
             need = ("non-owned evidence only; run a Gravitas-owned validator "
                     "after the final mutation for completion-grade proof")
+        missing_validators = [
+            validator_id for validator_id, verdict in info.get("validators", {}).items()
+            if verdict != "PASS"
+        ]
+        if missing_validators:
+            need += " (validators: " + ", ".join(missing_validators) + ")"
         deficit.append({"criterion": identifier, "status": status,
                         "statement": info["statement"], "needed": need,
                         "stale_owned": info.get("stale_owned", 0)})

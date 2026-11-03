@@ -15,11 +15,7 @@ from datetime import datetime, timezone
 from impact_graph import build_impact_graph
 from evidence_chain import resolution_matches, verified_resolution_records
 from session_context import session_dir_for_payload
-from gravitas_evidence import criterion_states, is_fresh, owned_validator_pass
-
-
-def criterion_id(criterion: object, index: int) -> str:
-    return criterion.get("id") if isinstance(criterion, dict) else f"AC{index}"
+from gravitas_evidence import criterion_states
 
 
 def load_state(session_dir: Path) -> dict:
@@ -56,10 +52,6 @@ def update_state_from_evidence(state: dict, session_dir: Path) -> dict:
                 pass
 
     files_touched = set(state.get("files_touched", []))
-    # Authoritative recompute: entries that went stale (write after PASS)
-    # must not survive from a previous run. Seed retention caused
-    # state.json to report completed criteria the ledger no longer supports.
-    completed_criteria: set = set()
     read_files = set(state.get("read_files", []))
 
     for entry in entries:
@@ -67,20 +59,19 @@ def update_state_from_evidence(state: dict, session_dir: Path) -> dict:
             files_touched.add(entry["file"])
         if entry.get("source") == "read" and entry.get("file"):
             read_files.add(entry["file"])
-        # Only fresh owned PASS counts: evidence predating the final
-        # mutation is stale and must be re-run.
-        if owned_validator_pass(entry) and is_fresh(entry, entries):
-            completed_criteria.update(entry.get("criterion_ids", []))
 
     state["files_touched"] = sorted(files_touched)
-    state["completed_criteria"] = sorted(completed_criteria)
     state["read_files"] = sorted(read_files)
 
     contract_path = session_dir / "contract.json"
     contract = json.loads(contract_path.read_text()) if contract_path.exists() else {}
-    criteria = contract.get("acceptance_criteria", [])
-    criterion_ids = [criterion_id(criterion, index) for index, criterion in enumerate(criteria, 1)]
-    state["pending_criteria"] = [identifier for identifier in criterion_ids if identifier not in completed_criteria]
+    states = criterion_states(contract, entries)
+    state["completed_criteria"] = sorted(
+        identifier for identifier, info in states.items() if info["status"] == "PASS"
+    )
+    state["pending_criteria"] = [
+        identifier for identifier, info in states.items() if info["status"] != "PASS"
+    ]
 
     if state["files_touched"]:
         graph, targets = build_impact_graph(Path.cwd(), state["files_touched"])
@@ -114,8 +105,7 @@ def update_state_from_evidence(state: dict, session_dir: Path) -> dict:
             if not resolution_matches(entry, resolutions.get(entry.get("resolution_id")))
         ]
 
-    coverage = {identifier: info["status"]
-                for identifier, info in criterion_states(contract, entries).items()}
+    coverage = {identifier: info["status"] for identifier, info in states.items()}
     (session_dir / "coverage.json").write_text(json.dumps(coverage, indent=2) + "\n")
     return state
 

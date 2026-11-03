@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
-"""Shared benchmark outcome contract.
+"""Canonical benchmark outcomes shared by episode producers and validation.
 
-Both episode producers (``implementation.py``, ``run.py``) and the
-validator (``validate.py``) must agree on what counts as success.
-Previously ``implementation`` required ``not error`` while ``validate``
-only required all validators PASS, so a step-limit episode with passing
-hidden tests disagreed.
-
-Outcome components (all recorded separately):
-- tests_passing: hidden acceptance validator passed
-- finished_normally: agent reached ``finish`` within the step budget
-- scope_ok: no write-scope violation
-- infrastructure_failure: provider/timeout failure (INVALID run)
+Every recorded validator is mandatory. Passing hidden tests alone does not
+make an episode solved when scope, the step budget, a checkpoint, or any
+additional validator fails.
 """
 from __future__ import annotations
 
@@ -21,12 +13,18 @@ def derive_outcome(
     finished_normally: bool,
     scope_ok: bool,
     infrastructure_failure: bool,
+    validators_passing: bool | None = None,
 ) -> dict:
-    """Derive the canonical outcome dict from its four components."""
+    """Derive success, preserving callers that predate additional validators."""
+    if validators_passing is None:
+        validators_passing = bool(
+            tests_passing and finished_normally and scope_ok and not infrastructure_failure
+        )
     functional_solve = bool(
         tests_passing
         and finished_normally
         and scope_ok
+        and validators_passing
         and not infrastructure_failure
     )
     return {
@@ -34,54 +32,70 @@ def derive_outcome(
         "finished_normally": bool(finished_normally),
         "scope_ok": bool(scope_ok),
         "infrastructure_failure": bool(infrastructure_failure),
+        "validators_passing": bool(validators_passing),
         "functional_solve": functional_solve,
     }
 
 
-def outcome_from_validators(validator_outputs: list) -> dict | None:
-    """Reconstruct outcome components from validator criteria.
+def validators_pass(validator_outputs: list) -> bool:
+    """All outputs, including duplicate or additional criteria, must pass."""
+    return isinstance(validator_outputs, list) and bool(validator_outputs) and all(
+        isinstance(output, dict) and output.get("result") == "PASS"
+        for output in validator_outputs
+    )
 
-    Returns None when the episode uses a legacy validator set without the
-    step-budget criterion (e.g. plan-only smoke episodes). Callers must
-    fall back to all-PASS semantics in that case.
-    """
+
+def outcome_from_validators(validator_outputs: list) -> dict | None:
+    """Reconstruct implementation components; legacy sets use all-PASS semantics."""
     if not isinstance(validator_outputs, list) or not validator_outputs:
         return None
-    by_criterion = {
-        output.get("criterion"): output.get("result")
+    by_criterion = {}
+    for output in validator_outputs:
+        if isinstance(output, dict) and isinstance(output.get("criterion"), str):
+            by_criterion.setdefault(output["criterion"], []).append(output.get("result"))
+    def passed(criterion):
+        results = by_criterion.get(criterion, [])
+        return bool(results) and all(result == "PASS" for result in results)
+
+    infrastructure_failure = any(
+        isinstance(output, dict) and output.get("result") == "INVALID"
         for output in validator_outputs
-        if isinstance(output, dict)
-    }
-    if "Episode finished within step budget" not in by_criterion:
-        return None
-    tests_passing = by_criterion.get("Hidden acceptance") == "PASS"
-    finished_normally = by_criterion.get("Episode finished within step budget") == "PASS"
-    scope_ok = by_criterion.get("Allowed write scope") == "PASS"
-    infrastructure_failure = "INVALID" in list(by_criterion.values())
-    return derive_outcome(tests_passing, finished_normally, scope_ok, infrastructure_failure)
+    )
+    if "Episode finished within step budget" in by_criterion:
+        return derive_outcome(
+            tests_passing=passed("Hidden acceptance"),
+            finished_normally=passed("Episode finished within step budget"),
+            scope_ok=passed("Allowed write scope"),
+            infrastructure_failure=infrastructure_failure,
+            validators_passing=validators_pass(validator_outputs),
+        )
+    plan = "Plan-only response contains a numbered plan"
+    no_tools = "Runner grants no filesystem or shell tools"
+    if plan in by_criterion and no_tools in by_criterion:
+        return derive_outcome(
+            tests_passing=passed(plan),
+            finished_normally=not infrastructure_failure,
+            scope_ok=all(result != "FAIL" for result in by_criterion[no_tools]),
+            infrastructure_failure=infrastructure_failure,
+            validators_passing=validators_pass(validator_outputs),
+        )
+    return None
 
 
 def expected_derived_fields(validator_outputs: list, claimed_success: bool) -> dict | None:
-    """Return expected functional_solve/false_completion/infrastructure_failure.
-
-    Uses the step-budget-aware outcome when available, else legacy all-PASS.
-    Returns None for empty/non-list validator sets (caller reports an error).
-    """
+    """Return the truth fields implied by every recorded validator result."""
     if not isinstance(validator_outputs, list) or not validator_outputs:
         return None
     outcome = outcome_from_validators(validator_outputs)
     if outcome is not None:
         solved = outcome["functional_solve"]
+        invalid = outcome["infrastructure_failure"]
     else:
-        results = [
-            output.get("result") for output in validator_outputs if isinstance(output, dict)
-        ]
-        solved = bool(results) and len(results) == len(validator_outputs) and all(
-            result == "PASS" for result in results
-        )
-        outcome = {"infrastructure_failure": "INVALID" in results}
+        solved = validators_pass(validator_outputs)
+        invalid = any(isinstance(output, dict) and output.get("result") == "INVALID"
+                      for output in validator_outputs)
     return {
         "functional_solve": solved,
         "false_completion": bool(claimed_success) and not solved,
-        "infrastructure_failure": bool(outcome["infrastructure_failure"]),
+        "infrastructure_failure": bool(invalid),
     }

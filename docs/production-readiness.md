@@ -1,41 +1,58 @@
 # GRAVITAS production-readiness gates
 
-Last reviewed: 2026-10-07 (release-candidate audit; see Definition of Done below).
+Last reviewed: **2026-11-03**. This board distinguishes locally verified
+properties from release readiness. The broader source-linked assessment is
+[the project review](project-review-2026-11-03.md). The subsequent
+[pre-push validation](prepush-validation-2026-11-03.md) repairs contributor
+workflow orchestration, user-install lookup, and native agent metadata.
 
 | Gate | Status | Evidence / remaining boundary |
 |---|---|---|
-| Agent Skills format | PASS | Skill frontmatter validated in CI; OpenCode name/description rules tested. |
-| Core project install | PASS | `gravitas init` scaffolds skills without clobbering; idempotence tested. |
-| Native plugin packaging | PASS | `agy` 1.2.2 validates `dist/gravitas-antigravity` (2 skills, 3 agents, hooks); bundle drift checked in CI. |
-| OpenCode adapter | PASS | Templates + shim + guard + init tested; capability differences documented. |
-| Wheel/sdist install | PASS | Wheel ships 60+ runtime files; CI force-reinstalls and smokes `doctor`/`decide` outside any checkout. |
-| Runtime unit tests | PASS | 159 tests: policy, action bypass/fuzz, context, verification, adapters, bench plumbing. |
-| Live hook trajectory | PARTIAL | Fixture-pinned payloads and `agy plugin validate` pass; a production model trajectory remains outside install verification. |
-| Benchmark corpus | PARTIAL | 30 specs, 10 lanes, solver-blind synthetic fixtures, holdout + ablations; licensed pinned repos and hidden real validators pending. |
-| Comparative results | BLOCKED | No eligible paired production dataset. |
-| Public performance claims | BLOCKED | Research-preview disclosures enforced by `check_readme_claims.py` + report publication gate. |
+| Agent Skills format | TESTED | Frontmatter and portable skill structure have deterministic validators. Format conformance is not runtime enforcement. |
+| Core project scaffolding | TESTED | Non-clobbering/idempotent init paths pass unit tests and clean installed external-workspace checks for both hosts. |
+| Native generated bundle | TESTED | Canonical-source and deterministic SHA-256 manifest parity checks pass; strict agy 1.4.9 loads 2 skills and 3 agents without warnings. |
+| Runtime evidence reduction | TESTED | Latest required-validator failures block completion; assigned coverage and saved recovery state share the reducer. |
+| Full host lifecycle | PARTIAL | Local hook fixtures are tested; enclosing-validator self-staleness remains a known separate issue. No new live model trajectory was executed. |
+| OpenCode adapter | PARTIAL | Guard, scope, and session-read logic have tests; after-hook payload/version mismatch remains. No automatic native-equivalent Stop hook. |
+| Delegated child handoff | PARTIAL | Happy paths are tested; empty mutating scope, caller-selected handoff criteria, and child evidence authentication need hardening. |
+| Wheel/sdist installation | TESTED / PARTIAL | Fresh-venv and actual disposable user installs pass installed-mode and external-workspace init checks. Cross-platform installation coverage remains incomplete. |
+| Python/platform support | PARTIAL | Package preserves Python >=3.9; CI covers Ubuntu 3.9/3.12/3.14 with Node 22. Local full suites passed on macOS/Python 3.12.13 and 3.14.6. Python 3.9 is upstream end-of-life; Windows/live-host certification is not established here. |
+| Benchmark outcome integrity | TESTED | Failed checkpoints/additional mandatory validators prevent a solve; contradictory component values and duplicate criteria are rejected. |
+| Benchmark corpus | PARTIAL | 48 registered specs, 10 lanes, three holdouts; executable factory still rotates five synthetic exercises. HARV specifications are not real-repository runner integration. |
+| Publication eligibility | TESTED | Explicit repository provenance, paired revision consistency, uniqueness, and >=30 tasks x >=5 valid paired runs are required. The gate checks declarations, not artifact authenticity. |
+| Comparative results | BLOCKED | No eligible licensed repository experiment or published paired dataset is established. |
+| Measured performance claims | BLOCKED | No model gains, cost reduction, or competitor superiority were measured by this upgrade. |
 
-## Definition of Done audit (2026-10-07)
+## Verification boundaries
 
-- Canonical structure unambiguous: PASS (`skills/` canonical, `dist/` generated, `adapters/` host templates, `docs/adr/` decisions).
-- Main CI green: PASS (local gate mirrors every CI step; remote run pending push).
-- Installed CLI works outside checkout: PASS (isolated-venv + CI smoke).
-- Deprecated host assumptions removed: PASS (workflows migrated; schemas verified vs live docs 2026-10-07).
-- Competitor-imitation positioning removed: PASS (sweep clean; claims guard extended).
-- Small stable policy kernel: PASS (6 invariants; `decide()` records).
-- Adaptive planning/verification: PASS (conditional levels; escalation planner).
-- Repository/context intelligence: PASS (cached graph, ranked retrieval, summaries).
-- Acceptance criteria with evidence state: PASS (6 states; deficit-driven).
-- Reproduction-first debugging: PASS (`repro` pairs + UNVERIFIABLE path).
-- Stale evidence cannot satisfy gates: PASS (freshness enforced in gate + coverage).
-- Action policy beyond regex denylisting: PASS (tokenizer + capability levels + fuzz).
-- Antigravity current surfaces: PASS (`agy plugin validate`; rules/ + skills).
-- OpenCode genuinely supported: PASS (init/agents/permissions/shim tested vs 1.18.35).
-- Recovery from durable state: PASS (`summarize`/`resume` carry full handoff).
-- Real pinned tasks + hidden validators: PARTIAL (synthetic solver-blind fixtures; licensed repos pending).
-- Component ablations possible: PASS (configs declared; runs pending provider access).
-- Security limitations documented: PASS (`SECURITY.md` contract + tested threat model).
-- Simple installation: PASS (`init` + wheel + quickstart).
-- Documentation current: PASS (launch hierarchy; research archive bannered).
-- Reproducible release artifacts: PARTIAL (wheel/sdist build in CI; no release tag cut here).
-- Evidence-backed claims only: PASS (no marketing numbers; gates enforced in code).
+The pre-upgrade local suite reported `Ran 391 tests in 19.666s` and `OK`.
+The integrity regressions add actual local subprocess lifecycles and
+provider-mocked benchmark cases; run the suite for the current total:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests
+.venv/bin/python benchmarks/runner/audit.py
+.venv/bin/python .github/scripts/validate_skill.py
+.venv/bin/python scripts/check_readme_claims.py
+```
+
+Passing local tests does not certify an untested host version, a secure
+sandbox, or a statistically valid model comparison. Native bundle/source
+parity is checked by `tests/test_bundle_manifest.py`. Tests create temporary
+local repositories/files and mock provider calls; no paid inference is
+needed.
+
+## Release blockers
+
+1. Complete host payload/lifecycle tests and repair the documented validator,
+   OpenCode after-hook, and child-handoff boundaries.
+2. Verify clean installed CLI behavior across declared installation schemes
+   and supported Python/OS versions.
+3. Execute real licensed pinned tasks with independently held executable
+   validators, retained artifacts, and reproducible configurations.
+4. Collect the pre-registered paired study, account for task clustering, and
+   review provenance/uncertainty before publishing performance numbers.
+
+The older 2026-10-07 readiness assertions are historical observations, not
+current blanket certification. The 2026-11-03 review deliberately downgrades
+areas where tests or documentation did not support the broader claim.

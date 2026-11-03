@@ -120,7 +120,7 @@ What enforcement is not: hooks are workflow controls, not an operating-system sa
 
 Completion-grade evidence has a precise definition: a record produced by a Gravitas-owned execution (`validator_runner.py`), naming a declared validator and criterion, carrying exit code 0, timestamped strictly after the latest file write in the ledger, and sitting in an intact hash chain. Anything weaker (hook telemetry, reproducer output, prose) is recorded as supporting context and cannot satisfy the gate.
 
-Three mechanisms protect this definition. First, the Stop gate verifies chain integrity before reading any verdict, so edited or reordered ledger lines refuse completion instead of passing it. Second, freshness is recomputed from the ledger on every run; a file write after a PASS returns the criterion to pending until a new PASS lands. Third, validator identity is bound: the executed command must equal the contract declaration, the criterion must be assigned to that validator, and timeouts or interruptions record FAIL, never PASS. Output is capped and hashed digest-only so verbose tools cannot exhaust the runner.
+Three mechanisms protect this definition. First, the Stop gate verifies chain integrity before reading any verdict, so edited or reordered ledger lines refuse completion instead of passing it. Second, freshness is recomputed from the ledger on every run; a file write after a PASS returns the criterion to pending until new evidence covers every assigned validator. A validator's newer failure cannot be masked by its older PASS or another validator's success, and recovery state uses the same criterion reducer. Third, validator identity is bound: the executed command must equal the contract declaration, the criterion must be assigned to that validator, and timeouts or interruptions record FAIL, never PASS. Output is capped and hashed digest-only so verbose tools cannot exhaust the runner.
 
 Hash chains deserve one unsentimental sentence: they make silent edits detectable, they do not stop an attacker who can rewrite the whole ledger. The model assumes filesystem integrity and states so.
 
@@ -140,13 +140,13 @@ Quoted separators are a known over-approximation (`echo "a;b"` classifies as mut
 
 ## Verification
 
-The suite currently holds 188 tests: action locking, a shell-bypass corpus, scope and path-traversal checks, session isolation, evidence tampering, stale-gate behavior, packaging integrity, CLI integration, and deterministic fuzzing. Reproduce locally:
+The suite covers action locking, a shell-bypass corpus, scope and path-traversal checks, session isolation, evidence tampering, stale/latest-validator gate behavior, packaging integrity, CLI integration, benchmark outcome/publication integrity, and deterministic fuzzing. The 2026-11-03 pre-upgrade baseline passed 391 tests; run the command below for the current count. Research findings and upgrade scope are recorded in [the project review](docs/project-review-2026-11-03.md). Reproduce locally:
 
 ```bash
 python -m unittest discover -s tests
 ```
 
-The full gate, as run by CI on Python 3.9 and 3.12, is:
+The full gate, as run by CI on Python 3.9, 3.12, and 3.14 with Node 22 for adapter tests, is:
 
 ```bash
 python -m unittest discover -s tests
@@ -158,7 +158,7 @@ python scripts/check_readme_claims.py
 bash scripts/build-native-bundle.sh
 ```
 
-A clean wheel install plus external-workspace init is smoke-tested from an isolated virtualenv (both skills land, `opencode.json` merges without clobbering). The installed `agy plugin validate` passes on the canonical plugin and the generated bundle.
+CI builds the wheel and source distribution, installs the wheel with dependencies into a fresh virtual environment, and checks the console CLI and both host initialization paths in external temporary workspaces. The pre-push review also tested a disposable user installation and repaired its asset resolution. Strict native validation now loads both skills and all three agents. See [pre-push verification](docs/prepush-validation-2026-11-03.md) and [the readiness board](docs/production-readiness.md) for platform and live-host limits.
 
 ## Star History
 
@@ -170,16 +170,16 @@ A clean wheel install plus external-workspace init is smoke-tested from an isola
 
 ## Contributors
 
-| [![Uday Sharma](https://github.com/udaysharmadev.png?size=100)](https://github.com/udaysharmadev) | [![Devansh Singh](https://github.com/devuuuxd.png?size=100)](https://github.com/devuuuxd) | [![Manan Bharti](https://github.com/mananbharti.png?size=100)](https://github.com/mananbharti) | [![Rudra Makwana](https://github.com/RudraMakwana257.png?size=100)](https://github.com/RudraMakwana257) | [![Neel Dharmendra](https://github.com/Neel-2606.png?size=100)](https://github.com/Neel-2606) | [![Ankit Tiwari](https://github.com/ankitkumartiwari-web.png?size=100)](https://github.com/ankitkumartiwari-web) |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| [Uday Sharma](https://github.com/udaysharmadev) | [Devansh Singh](https://github.com/devuuuxd) | [Manan Bharti](https://github.com/mananbharti) | [Rudra Makwana](https://github.com/RudraMakwana257) | [Neel Dharmendra](https://github.com/Neel-2606) | [Ankit Tiwari](https://github.com/ankitkumartiwari-web) |
-| maintainer | shell-injection hardening (#1) | init safety, classifier + policy/gate hardening | evidence freshness, sed/exec-config hardening | shell classifier fixes (#34–#36) | gate/contract hardening, Windows portability |
+| [![Uday Sharma](https://github.com/udaysharmadev.png?size=100)](https://github.com/udaysharmadev) | [![Devansh Singh](https://github.com/devuuuxd.png?size=100)](https://github.com/devuuuxd) | [![Manan Bharti](https://github.com/mananbharti.png?size=100)](https://github.com/mananbharti) | [![Rudra Makwana](https://github.com/RudraMakwana257.png?size=100)](https://github.com/RudraMakwana257) | [![Neel Dharmendra](https://github.com/Neel-2606.png?size=100)](https://github.com/Neel-2606) | [![Ankit Tiwari](https://github.com/ankitkumartiwari-web.png?size=100)](https://github.com/ankitkumartiwari-web) | [![Pasit Nusso](https://github.com/montionugera.png?size=100)](https://github.com/montionugera) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [Uday Sharma](https://github.com/udaysharmadev) | [Devansh Singh](https://github.com/devuuuxd) | [Manan Bharti](https://github.com/mananbharti) | [Rudra Makwana](https://github.com/RudraMakwana257) | [Neel Dharmendra](https://github.com/Neel-2606) | [Ankit Tiwari](https://github.com/ankitkumartiwari-web) | [Pasit Nusso](https://github.com/montionugera) |
+| maintainer | shell-injection hardening (#1) | init safety, classifier + policy/gate hardening | evidence freshness, sed/exec-config hardening | shell classifier fixes (#34–#36) | gate/contract hardening, Windows portability | PR #82 |
 
 <br />
 
 ## Benchmark status
 
-GravitasBench currently holds **30 registered task specifications across 10 planned lanes**: task design, schemas, a runner, and smoke fixtures. That is infrastructure, not results. No solve rates, no requirement-coverage numbers, no token or latency comparisons, and no model rankings are published, because the preconditions for a credible comparison do not exist yet: pinned tasks, hidden independent validators, identical task sets across baseline and treatment, fixed model and host revisions, repeated runs in clean isolation, recorded failures, and reported overhead with uncertainty. Until then, every performance statement in this repository is a hypothesis with its status labeled. Methodology and release gates: [docs/benchmark.md](docs/benchmark.md), [docs/production-readiness.md](docs/production-readiness.md). The latest hardening audit, with reproductions and residual limitations, is [docs/audits/v5-audit.md](docs/audits/v5-audit.md).
+GravitasBench currently holds **48 registered task specifications across 10 planned lanes** (30 core + 5 negative + 5 trap + 8 harvested). The executable runner still rotates five synthetic fixtures; harvested specifications do not yet execute their pinned repositories. That is infrastructure, not results. No solve rates, requirement-coverage numbers, token or latency comparisons, or model rankings are published. The publication gate requires explicit repository provenance, matching experiment inputs, unique run identities, and at least 30 distinct tasks with five valid paired runs each; current smoke/synthetic runners are ineligible regardless of sample size. Declarations still require independent artifact review before release. Methodology and release gates: [docs/benchmark.md](docs/benchmark.md), [docs/production-readiness.md](docs/production-readiness.md). The latest source-linked research and integrity upgrade are in [the 2026-11-03 project review](docs/project-review-2026-11-03.md).
 
 ## Related work
 
@@ -193,7 +193,7 @@ Each source below motivates one mechanism. None of them establishes an effect si
 
 ## Limitations
 
-Stated plainly, so nobody discovers them in production: Native hooks do not sandbox processes. The OpenCode V1 runtime is unvalidated here and its schema differs from V2. No live model-backed OpenCode run has been performed (it would spend paid quota). Read-before-write tracking in the OpenCode adapter is per call, so existing-file writes deny until session read tracking exists. Concurrent sessions are isolated by directory and conversation hash, not by OS controls. Anything above that you need is out of scope until documented otherwise.
+Stated plainly, so nobody discovers them in production: Native hooks do not sandbox processes. An enclosing validator shell command can still invalidate its own evidence during host post-processing; this lifecycle boundary needs separate hardening. OpenCode has session-scoped read tracking, but a confirmed after-hook argument-shape mismatch and version differences prevent a blanket compatibility claim. No new live model-backed OpenCode run was performed during this review. Child handoff scope/evidence checks still have documented remaining gaps; the subsequent pre-push review repaired user-install asset resolution. Concurrent sessions are isolated by directory and conversation hash, not by OS controls. See [the project review](docs/project-review-2026-11-03.md) for reproductions, priorities, and verification limits.
 
 ## Documentation
 
