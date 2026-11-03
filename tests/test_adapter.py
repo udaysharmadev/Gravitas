@@ -103,6 +103,19 @@ class BundleSurfaceTests(unittest.TestCase):
             self.assertLessEqual(
                 len(" ".join(description.group(1).split())), 1024, skill)
 
+    def test_native_agents_have_loadable_metadata(self):
+        import yaml
+        agents = sorted((self.plugin() / "agents").glob("*.md"))
+        self.assertEqual(len(agents), 3)
+        for agent in agents:
+            with self.subTest(agent=agent.name):
+                text = agent.read_text(encoding="utf-8")
+                self.assertTrue(text.startswith("---\n"), agent.name)
+                metadata = yaml.safe_load(text.split("---", 2)[1])
+                self.assertEqual(metadata["name"], agent.stem)
+                self.assertTrue(metadata["description"].strip())
+                self.assertLessEqual(len(metadata["description"]), 1024)
+
     def test_rule_frontmatter(self):
         for rule in (self.plugin() / "rules").glob("*.md"):
             frontmatter = rule.read_text()[4:].partition("\n---\n")[0]

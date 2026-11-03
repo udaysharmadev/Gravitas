@@ -44,10 +44,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
-          python scripts/sync_contributors.py --owner "$GITHUB_REPOSITORY_OWNER" --repo "${GITHUB_REPOSITORY#*/}" --token "$GH_TOKEN" --check && echo "IN_SYNC=1" >> "$GITHUB_ENV" || echo "IN_SYNC=0" >> "$GITHUB_ENV"
-          if [ "$IN_SYNC" = "0" ]; then
-            python scripts/sync_contributors.py --owner "$GITHUB_REPOSITORY_OWNER" --repo "${GITHUB_REPOSITORY#*/}" --token "$GH_TOKEN"
-          fi
+          python scripts/sync_contributors.py --owner "$GITHUB_REPOSITORY_OWNER" --repo "${GITHUB_REPOSITORY#*/}" --token "$GH_TOKEN"
+          diff_status=0
+          git diff --quiet -- README.md CONTRIBUTORS.md || diff_status=$?
+          case "$diff_status" in
+            0) printf 'IN_SYNC=1\n' >> "$GITHUB_ENV" ;;
+            1) printf 'IN_SYNC=0\n' >> "$GITHUB_ENV" ;;
+            *) exit "$diff_status" ;;
+          esac
 
       - name: Skip if an update PR is already open
         if: env.IN_SYNC == '0'
@@ -68,7 +72,7 @@ jobs:
           git config user.email "gravitas-contrib-bot@users.noreply.github.com"
           git checkout -b chore/sync-contributors
           git add README.md CONTRIBUTORS.md
-          git commit -m "chore(contributors): sync wall for new contributors" -m "Automated by Sync Contributors workflow." || exit 0
+          git commit -m "chore(contributors): sync wall for new contributors" -m "Automated by Sync Contributors workflow."
           git push --force-with-lease origin chore/sync-contributors
           gh pr create --title "chore(contributors): sync wall for new contributors" \
             --body "Automated contributor-wall sync. Existing entries untouched; newcomers appended with PR-number credits. CI is dispatched explicitly onto this branch; auto-merges on green." \

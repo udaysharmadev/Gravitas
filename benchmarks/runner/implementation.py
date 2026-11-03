@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 from fixtures import check_holdout, hidden_test_source, materialize
-from outcome import derive_outcome
+from outcome import derive_outcome, validators_pass
 from run import GeminiRequestError, api_key, generate_content, load_manifest, load_task, result_path
 
 
@@ -214,7 +214,7 @@ def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
         finished_normally = error is None
         # Tier-2 checkpoint: automated harnesses use the simulated approver.
         # A denied checkpoint fails the episode (no silent pass).
-        checkpoint_validator, simulated_approval, approved = tier2_checkpoint(
+        checkpoint_validator, simulated_approval, _ = tier2_checkpoint(
             task, final, "hidden acceptance executed post-trajectory")
         validators = [
             {"criterion": "Hidden acceptance", "result": "PASS" if test_passed else "FAIL", "output": hidden_result["output"]},
@@ -227,7 +227,6 @@ def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
         ]
         if checkpoint_validator is not None:
             validators.append(checkpoint_validator)
-            test_passed = bool(test_passed and approved)
     except (GeminiRequestError, subprocess.TimeoutExpired) as failure:
         error = str(failure)
         infrastructure_failure = True
@@ -244,11 +243,13 @@ def _run_episode_in_worktree(task, model, configuration, max_steps, worktree):
         finished_normally=finished_normally,
         scope_ok=not scope_violation,
         infrastructure_failure=infrastructure_failure,
+        validators_passing=validators_pass(validators),
     )
     solved = outcome["functional_solve"]
     return {
         "task_id": task["task_id"], "task_lane": LANE_BY_TASK.get(task["task_id"], "ambiguous-requirements"),
         "repo_commit": task["commit"], "model": model, "effort": "eco", "configuration": configuration,
+        "evidence_kind": "synthetic",
         "gravitas_version": "4.0", "run_index": 1,
         "contract": {"mode": "implement", "allowed_write_scope": fixture["allowed_write_scope"]},
         "trajectory": trajectory, "tool_calls": tool_calls, "subagents_spawned": 0,

@@ -118,6 +118,7 @@ def build_episode(task, model, configuration, response, tokens, duration, error=
         "model": model,
         "effort": "eco",
         "configuration": configuration,
+        "evidence_kind": "smoke",
         "gravitas_version": "4.0",
         "run_index": 1,
         "contract": {"mode": "plan-only", "allowed_write_scope": []},

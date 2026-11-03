@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Claim generation pipeline: validated episodes -> markdown + CSV.
 
-The pipeline is claim-gated.  A report may call itself publication-ready only
-when every comparison it contains is paired over at least 30 valid episodes
-(benchmarks/runner/compare.py sets ``publication_ready``).  Reports that do
-not meet the gate are rendered with a research-preview banner, a mandatory
-disclosure block, and no comparative-superiority language.  Infrastructure
-failures are always reported as INVALID counts, never silently dropped.
+The pipeline is claim-gated. Reports require explicit repository provenance,
+matched revisions, and at least 30 distinct tasks with 5 valid paired runs each.
+Reports that do not meet the gate retain a research-preview banner and explain
+the blockers. Infrastructure failures remain visible as INVALID counts.
 """
 import csv
 import copy
@@ -15,21 +13,34 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from compare import MIN_PUBLICATION_TASKS, MIN_RUNS_PER_TASK
+except ImportError:  # pragma: no cover - package import
+    from benchmarks.runner.compare import MIN_PUBLICATION_TASKS, MIN_RUNS_PER_TASK
+
 
 DISCLOSURES = [
     "Infrastructure failures are classified INVALID and excluded from denominators; they are never counted as model failures.",
     "Synthetic fixture corpora prove benchmark plumbing; they are not licensed OSS tasks and do not generalize.",
-    "Fewer than 30 paired episodes per comparison is not publishable benchmark evidence.",
+    "Publication requires at least 30 distinct tasks with 5 valid paired runs per task, explicit repository provenance, and matched model/task/evaluator revisions.",
+    "Provenance checks validate declarations and pairing, not artifact authenticity; independent review of raw evidence is still required.",
     "All rates carry Wilson 95% confidence intervals; continuous metrics report median and p90.",
 ]
 
 
 def publication_ready(comparisons):
-    """True only when every comparison has at least 30 valid paired episodes."""
+    """Require the complete eligibility result, not a legacy boolean claim."""
     if not comparisons:
         return False
     return all(
-        comparison.get("paired_episodes", 0) >= 30 and comparison.get("publication_ready")
+        isinstance(comparison, dict)
+        and comparison.get("publication_ready") is True
+        and comparison.get("publication_blockers") == []
+        and all(type(comparison.get(field)) is int for field in
+                ("paired_episodes", "paired_tasks", "min_pairs_per_task"))
+        and comparison["paired_tasks"] >= MIN_PUBLICATION_TASKS
+        and comparison["min_pairs_per_task"] >= MIN_RUNS_PER_TASK
+        and comparison["paired_episodes"] >= comparison["paired_tasks"] * comparison["min_pairs_per_task"]
         for comparison in comparisons
     )
 
@@ -37,11 +48,15 @@ def publication_ready(comparisons):
 def render_markdown(summary, comparisons, meta=None, publish=False):
     """Render the results report.  Raises ValueError when publish=True but the gate fails."""
     meta = meta or {}
-    ready = publication_ready(comparisons)
+    compared = {comparison.get(field) for comparison in comparisons
+                for field in ("baseline", "treatment")}
+    uncompared = sorted(set(summary) - compared)
+    ready = publication_ready(comparisons) and not uncompared
     if publish and not ready:
         raise ValueError(
-            "publication gate failed: every comparison needs at least 30 valid paired episodes; "
-            "regenerate without --publish or collect more episodes"
+            "publication gate failed: every comparison needs repository provenance, matched revisions, "
+            "and at least 30 distinct tasks with 5 valid paired runs each; all reported configurations "
+            "must be covered. Regenerate without --publish to inspect publication blockers"
         )
 
     lines = ["# GravitasBench Results", ""]
@@ -74,6 +89,17 @@ def render_markdown(summary, comparisons, meta=None, publish=False):
         lines += _comparison_table(comparisons)
     else:
         lines += ["_No paired comparison was requested._"]
+    if not ready:
+        lines += ["", "## Publication blockers", ""]
+        if not comparisons:
+            lines += ["- No paired comparison was requested."]
+        if uncompared:
+            lines += ["- Configurations without a checked comparison: " + ", ".join(uncompared)]
+        for comparison in comparisons:
+            label = f"{comparison.get('baseline', 'baseline')} vs {comparison.get('treatment', 'treatment')}"
+            blockers = comparison.get("publication_blockers") or ["complete publication eligibility evidence is unavailable"]
+            if not publication_ready([comparison]):
+                lines += [f"- {label}: {reason}" for reason in blockers]
     lines += ["", "## INVALID episodes", ""]
     invalid_total = meta.get("invalid_episodes")
     lines += [f"- {invalid_total} episode(s) recorded as infrastructure failures." if invalid_total is not None
@@ -120,7 +146,7 @@ def _comparison_table(comparisons):
             f"| {comparison['treatment_fsr'] if comparison['treatment_fsr'] is not None else 'n/a'} "
             f"| {comparison['fsr_delta'] if comparison['fsr_delta'] is not None else 'n/a'} "
             f"| {ci_text} | {comparison['mcnemar']['two_sided_exact_p']} "
-            f"| {'yes' if comparison.get('publication_ready') else 'NO'} |"
+            f"| {'yes' if publication_ready([comparison]) else 'NO'} |"
         )
     return rows
 
@@ -176,9 +202,32 @@ def scrub_episode(episode):
 
 def write_report(summary, comparisons, output_dir, meta=None, publish=False, episodes=None):
     """Write report artifacts and sanitized episode exports into output_dir."""
+    if episodes is not None:
+        episodes = list(episodes)
+    if episodes is not None and (publish or comparisons):
+        try:
+            from compare import compare
+            from metrics import aggregate
+            from validate import episode_errors
+        except ImportError:  # pragma: no cover - package import
+            from benchmarks.runner.compare import compare
+            from benchmarks.runner.metrics import aggregate
+            from benchmarks.runner.validate import episode_errors
+        for episode in episodes:
+            errors = episode_errors(episode, {})
+            if errors:
+                raise ValueError("episode validation failed: " + "; ".join(errors))
+        summary = aggregate(episodes)
+        comparisons = [compare(episodes, comparison["baseline"], comparison["treatment"])
+                       for comparison in comparisons]
+        meta = {**(meta or {}), "invalid_episodes": sum(
+            episode.get("infrastructure_failure") is True for episode in episodes
+        )}
+    elif publish:
+        raise ValueError("publication gate failed: raw episodes are required to verify report eligibility")
+    markdown = render_markdown(summary, comparisons, meta=meta, publish=publish)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    markdown = render_markdown(summary, comparisons, meta=meta, publish=publish)
     report_path = output_dir / "report.md"
     report_path.write_text(markdown)
     csv_path = write_summary_csv(summary, output_dir / "summary.csv")

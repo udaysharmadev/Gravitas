@@ -105,15 +105,20 @@ def cmd_report(args):
     if not episodes:
         print(f"Episode validation failed: no valid episodes in {episodes_dir}", file=sys.stderr)
         return 2
+    if bool(args.baseline) != bool(args.treatment):
+        print("Report failed: --baseline and --treatment must be supplied together", file=sys.stderr)
+        return 2
     summary = aggregate(episodes)
-    comparisons = []
-    if args.baseline and args.treatment:
-        comparisons = [compare(episodes, args.baseline, args.treatment)]
     out = Path(args.out)
     meta = {"dataset": str(episodes_dir), "invalid_episodes": invalid,
             "models": f"{args.baseline} vs {args.treatment}"}
-    report_path, csv_path = write_report(summary, comparisons, out, meta=meta,
-                                         publish=args.publish, episodes=episodes)
+    try:
+        comparisons = [compare(episodes, args.baseline, args.treatment)] if args.baseline else []
+        report_path, csv_path = write_report(summary, comparisons, out, meta=meta,
+                                             publish=args.publish, episodes=episodes)
+    except (OSError, ValueError) as error:
+        print(f"Report failed: {error}", file=sys.stderr)
+        return 2
     print(f"Wrote {report_path} and {csv_path}")
     return 0
 

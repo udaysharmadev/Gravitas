@@ -2,10 +2,12 @@ name: GRAVITAS Verify
 
 on:
   push:
-    branches: [main, master]
   pull_request:
     branches: [main, master]
   workflow_dispatch:  # lets the contributor-sync bot trigger CI on its own PRs
+
+permissions:
+  contents: read
 
 jobs:
   gravitas-verify:
@@ -13,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.9', '3.12']
+        python-version: ['3.9', '3.12', '3.14']
 
     steps:
       - name: Checkout
@@ -23,6 +25,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Setup Node for adapter tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Install package and benchmark validator dependencies
         run: python -m pip install . -r benchmarks/runner/requirements.txt
@@ -54,11 +61,11 @@ jobs:
       - name: Package build and clean install smoke test
         run: |
           python -m pip install build
-          python -m build --outdir /tmp/gravitas-pkg
-          python -m pip install --force-reinstall --no-deps /tmp/gravitas-pkg/*.whl
-          cd /tmp && gravitas doctor
-          cd /tmp && gravitas decide --signals '{}'
-          cd /tmp && python -c "import gravitas_init; print(gravitas_init.detect_hosts('.'))"
+          package_dir="$(mktemp -d "$RUNNER_TEMP/gravitas-package.XXXXXX")"
+          python -m build --outdir "$package_dir/artifacts"
+          python -m venv "$package_dir/venv"
+          "$package_dir/venv/bin/python" -m pip install "$package_dir"/artifacts/*.whl
+          "$package_dir/venv/bin/python" scripts/check_installed_package.py
 
       - name: Validate portable skill structure
         run: python .github/scripts/validate_skill.py

@@ -2,6 +2,9 @@ name: Verify Skill
 
 on: [push, pull_request, workflow_dispatch]  # dispatch lets the contributor-sync bot trigger CI on its own PRs
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
