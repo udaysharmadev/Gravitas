@@ -170,10 +170,10 @@ CI builds the wheel and source distribution, installs the wheel with dependencie
 
 ## Contributors
 
-| [![Uday Sharma](https://github.com/udaysharmadev.png?size=100)](https://github.com/udaysharmadev) | [![Devansh Singh](https://github.com/devuuuxd.png?size=100)](https://github.com/devuuuxd) | [![Manan Bharti](https://github.com/mananbharti.png?size=100)](https://github.com/mananbharti) | [![Rudra Makwana](https://github.com/RudraMakwana257.png?size=100)](https://github.com/RudraMakwana257) | [![Neel Dharmendra](https://github.com/Neel-2606.png?size=100)](https://github.com/Neel-2606) | [![Ankit Tiwari](https://github.com/ankitkumartiwari-web.png?size=100)](https://github.com/ankitkumartiwari-web) |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| [Uday Sharma](https://github.com/udaysharmadev) | [Devansh Singh](https://github.com/devuuuxd) | [Manan Bharti](https://github.com/mananbharti) | [Rudra Makwana](https://github.com/RudraMakwana257) | [Neel Dharmendra](https://github.com/Neel-2606) | [Ankit Tiwari](https://github.com/ankitkumartiwari-web) |
-| maintainer | shell-injection hardening (#1) | init safety, classifier + policy/gate hardening | evidence freshness, sed/exec-config hardening | shell classifier fixes (#34–#36) | gate/contract hardening, Windows portability |
+| [![Uday Sharma](https://github.com/udaysharmadev.png?size=100)](https://github.com/udaysharmadev) | [![Devansh Singh](https://github.com/devuuuxd.png?size=100)](https://github.com/devuuuxd) | [![Manan Bharti](https://github.com/mananbharti.png?size=100)](https://github.com/mananbharti) | [![Rudra Makwana](https://github.com/RudraMakwana257.png?size=100)](https://github.com/RudraMakwana257) | [![Neel Dharmendra](https://github.com/Neel-2606.png?size=100)](https://github.com/Neel-2606) | [![Ankit Tiwari](https://github.com/ankitkumartiwari-web.png?size=100)](https://github.com/ankitkumartiwari-web) | [![Pasit Nusso](https://github.com/montionugera.png?size=100)](https://github.com/montionugera) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [Uday Sharma](https://github.com/udaysharmadev) | [Devansh Singh](https://github.com/devuuuxd) | [Manan Bharti](https://github.com/mananbharti) | [Rudra Makwana](https://github.com/RudraMakwana257) | [Neel Dharmendra](https://github.com/Neel-2606) | [Ankit Tiwari](https://github.com/ankitkumartiwari-web) | [Pasit Nusso](https://github.com/montionugera) |
+| maintainer | shell-injection hardening (#1) | init safety, classifier + policy/gate hardening | evidence freshness, sed/exec-config hardening | shell classifier fixes (#34–#36) | gate/contract hardening, Windows portability | PR #82 |
 
 <br />
 

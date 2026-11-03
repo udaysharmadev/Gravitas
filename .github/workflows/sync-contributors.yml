@@ -1,13 +1,10 @@
 name: Sync Contributors
 
 # Keeps the README wall + CONTRIBUTORS.md updated as new contributors land.
-# Fully automatic with the default GITHUB_TOKEN — no secrets needed.
-# How it works around the bot-CI trap: PRs opened by GITHUB_TOKEN never
-# trigger workflows on their own, so this job dispatches the verify
-# workflows explicitly onto the sync branch. Those runs report the same
-# check names the branch ruleset requires, and the PR auto-merges on green.
-# If dispatch ever fails, the PR stays open with a fallback note instead of
-# failing this run.
+# Opens an update PR when repository policy permits GITHUB_TOKEN to do so;
+# otherwise retains a patch artifact for maintainers. Bot-created PRs need
+# explicit CI dispatch. Auto-merge is used only when enabled by the repository.
+# No repository permissions or protection settings are changed by this job.
 #
 # Runs automatically on every push to main, weekly, or on demand.
 
@@ -53,8 +50,42 @@ jobs:
             *) exit "$diff_status" ;;
           esac
 
-      - name: Skip if an update PR is already open
+      - name: Check contributor automation capabilities
         if: env.IN_SYNC == '0'
+        id: capabilities
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          create_pr=false
+          auto_merge=false
+          if value=$(gh api "repos/$GITHUB_REPOSITORY/actions/permissions/workflow" --jq '.can_approve_pull_request_reviews' 2>/dev/null); then
+            if [ "$value" = "true" ]; then create_pr=true; fi
+          fi
+          if value=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.allow_auto_merge' 2>/dev/null); then
+            if [ "$value" = "true" ]; then auto_merge=true; fi
+          fi
+          printf 'create_pr=%s\nauto_merge=%s\n' "$create_pr" "$auto_merge" >> "$GITHUB_OUTPUT"
+          if [ "$create_pr" != "true" ]; then
+            printf 'Contributor changes are available as the contributor-update patch artifact. Bot PR creation is disabled or could not be verified; a maintainer must apply the patch.\n' >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$auto_merge" != "true" ]; then
+            printf 'Contributor update PRs require manual merge because repository auto-merge is disabled or could not be verified.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Prepare contributor update artifact
+        if: env.IN_SYNC == '0'
+        run: git diff --binary -- README.md CONTRIBUTORS.md > "$RUNNER_TEMP/contributor-update.patch"
+
+      - name: Retain contributor update artifact
+        if: env.IN_SYNC == '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: contributor-update
+          path: ${{ runner.temp }}/contributor-update.patch
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Skip if an update PR is already open
+        if: env.IN_SYNC == '0' && steps.capabilities.outputs.create_pr == 'true'
         id: gate
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,7 +94,7 @@ jobs:
           echo "already_open=$open" >> "$GITHUB_OUTPUT"
 
       - name: Open update PR and trigger its CI
-        if: env.IN_SYNC == '0' && steps.gate.outputs.already_open == '0'
+        if: env.IN_SYNC == '0' && steps.capabilities.outputs.create_pr == 'true' && steps.gate.outputs.already_open == '0'
         id: openpr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,7 +106,7 @@ jobs:
           git commit -m "chore(contributors): sync wall for new contributors" -m "Automated by Sync Contributors workflow."
           git push --force-with-lease origin chore/sync-contributors
           gh pr create --title "chore(contributors): sync wall for new contributors" \
-            --body "Automated contributor-wall sync. Existing entries untouched; newcomers appended with PR-number credits. CI is dispatched explicitly onto this branch; auto-merges on green." \
+            --body "Automated contributor-wall sync. Existing entries untouched; newcomers appended with PR-number credits. CI is dispatched explicitly onto this branch; auto-merge is requested only when repository policy permits it." \
             --base main --head chore/sync-contributors
           if gh workflow run "GRAVITAS Verify" --ref chore/sync-contributors \
             && gh workflow run "Verify Skill" --ref chore/sync-contributors; then
@@ -87,7 +118,7 @@ jobs:
           fi
 
       - name: Enable auto-merge on green
-        if: env.IN_SYNC == '0' && steps.gate.outputs.already_open == '0' && steps.openpr.outputs.dispatched == '1'
+        if: env.IN_SYNC == '0' && steps.capabilities.outputs.auto_merge == 'true' && steps.gate.outputs.already_open == '0' && steps.openpr.outputs.dispatched == '1'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh pr merge --auto --merge chore/sync-contributors

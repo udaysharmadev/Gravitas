@@ -128,5 +128,62 @@ git() {
         self.assertNotIn("|| exit 0", script)
 
 
+@unittest.skipUnless(shutil.which("bash"), "bash is required for workflow execution")
+class ContributorCapabilityTests(unittest.TestCase):
+    def capability_step(self, create_allowed="false", auto_merge="false", api_status=0):
+        steps = workflow("sync-contributors.yml")["jobs"]["sync"]["steps"]
+        step = next((step for step in steps if step.get("id") == "capabilities"), None)
+        self.assertIsNotNone(step, "contributor workflow needs capability preflight")
+        stubs = r'''
+gh() {
+  if [ "$API_STATUS" != 0 ]; then return "$API_STATUS"; fi
+  if [[ "$*" == *actions/permissions/workflow* ]]; then
+    printf '%s\n' "$CREATE_ALLOWED"
+  else
+    printf '%s\n' "$AUTO_MERGE"
+  fi
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output, summary = root / "output", root / "summary"
+            env = {**os.environ, "GITHUB_OUTPUT": str(output), "GITHUB_STEP_SUMMARY": str(summary),
+                   "CREATE_ALLOWED": create_allowed, "AUTO_MERGE": auto_merge,
+                   "API_STATUS": str(api_status), "GITHUB_REPOSITORY": "owner/repo"}
+            result = subprocess.run([shutil.which("bash"), "--noprofile", "--norc", "-eo", "pipefail", "-c", stubs + step["run"]],
+                                    cwd=root, env=env, text=True, capture_output=True)
+            return result, output.read_text() if output.exists() else "", summary.read_text() if summary.exists() else ""
+
+    def test_disabled_bot_capabilities_are_explicit_and_do_not_error(self):
+        result, output, summary = self.capability_step()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("create_pr=false", output)
+        self.assertIn("auto_merge=false", output)
+        self.assertIn("patch", summary)
+
+    def test_enabled_capabilities_are_preserved(self):
+        result, output, _ = self.capability_step(create_allowed="true", auto_merge="true")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("create_pr=true", output)
+        self.assertIn("auto_merge=true", output)
+
+    def test_unreadable_capabilities_fall_back_without_privilege_escalation(self):
+        result, output, summary = self.capability_step(api_status=403)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("create_pr=false", output)
+        self.assertIn("auto_merge=false", output)
+        self.assertIn("patch", summary)
+
+    def test_creation_and_merge_respect_capabilities_and_patch_is_retained(self):
+        steps = workflow("sync-contributors.yml")["jobs"]["sync"]["steps"]
+        creation = next(step for step in steps if step.get("id") == "openpr")
+        merge = next(step for step in steps if step.get("name") == "Enable auto-merge on green")
+        self.assertIn("steps.capabilities.outputs.create_pr == 'true'", creation["if"])
+        self.assertIn("steps.capabilities.outputs.auto_merge == 'true'", merge["if"])
+        upload = next((step for step in steps if step.get("uses", "").startswith("actions/upload-artifact@")), None)
+        self.assertIsNotNone(upload)
+        self.assertEqual(upload["with"]["name"], "contributor-update")
+
+
 if __name__ == "__main__":
     unittest.main()
